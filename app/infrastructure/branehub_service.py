@@ -11,7 +11,7 @@ MOCKDATA_DIR = Path(__file__).parent.parent / "mockdata"
 class BraneHubService:
 
     def get_integrator_config(self, project_id: str) -> IntegratorConfig | None:
-        raw_data = self._fetch_project(project_id)
+        raw_data = self._fetch_mock_project(project_id)
         if raw_data is None:
             return None
 
@@ -26,7 +26,7 @@ class BraneHubService:
             ],
         )
 
-    def _fetch_project(self, project_id: str) -> dict | None:
+    def _fetch_mock_project(self, project_id: str) -> dict | None:
         path = MOCKDATA_DIR / f"{project_id}.json"
         if not path.exists():
             return None
