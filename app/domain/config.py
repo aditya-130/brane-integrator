@@ -1,11 +1,11 @@
-from pydantic import BaseModel
 from typing import List
+from pydantic import BaseModel
 
 
 class ProjectBlock(BaseModel):
     project_id: str
-    objective: str
-    data_sensitivity: str  # Low | Medium | High
+    study_objective: str
+    data_sensitivity: str
     legal_basis: str
 
 
@@ -13,29 +13,21 @@ class WorkflowSpec(BaseModel):
     package: str
     local_function: str
     combine_function: str
-    coordinator_node: str
-    invocation_pattern: str  # "string_id" | "data_object"
+    coordinator_node: str  
 
 
-class DataFormat(BaseModel):
-    storage_types: List[str]
-    file_formats: List[str]
-    database_types: List[str]
 
 
 class ParticipantPolicy(BaseModel):
     brane_node: str
     dataset_name: str
-    data_locality: str          # local_only | flexible
-    purpose: str                # research | clinical_care | secondary_use
-    lawfulness_basis: str       # consent | public_interest | ...
-    identifiability: str        # Anonymized | Pseudonymized | Identifiable
-    network_policy: str         # Yes | No | ProxyOnly | VPNOnly | Restricted
-    audit_logging: str          # Yes | No | Conditional
-    model_updates_allowed: str  # Yes | AfterDifferentialPrivacy | No
-    requires_unlearning: str    # Yes | No | CaseByCase
+    identifiability: str
+    network_policy: str 
+    audit_logging: str  
+    model_updates_allowed: str
+    requires_unlearning: str  
     requires_per_round_approval: bool
-    data_format: DataFormat
+    data_format: str
 
 
 class IntegratorConfig(BaseModel):
