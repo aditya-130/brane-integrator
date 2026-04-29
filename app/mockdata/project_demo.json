@@ -1,43 +1,178 @@
 {
-   "project_id":"project_demo",
+   "schema_version":"1.0",
+   "project_id":42,
    "project":{
-      "study_objective":"Federated patient statistics computation across two hospitals",
-      "data_sensitivity_level":"High",
-      "legal_basis_for_processing":"GDPR Article 9(2)(j) — Scientific Research"
+      "title":"FedLung: Multi-Center Lung CT Analysis",
+      "description":"Train a lung-cancer classifier across participating hospitals without centralising imagery.",
+      "type":"FDP",
+      "status":"open",
+      "created_at":"2026-04-01T12:00:00Z",
+      "tags":[
+         "imaging",
+         "lung-cancer"
+      ],
+      "owner":{
+         "user_id":3,
+         "username":"prof.meyer",
+         "email":"meyer@institution.example"
+      },
+      "fdp_config":{
+         "research_institution":"University of Amsterdam",
+         "contact_email":"meyer@institution.example",
+         "study_objective":"Train a lung-cancer classifier across 3 hospitals",
+         "data_types_required":[
+            "CT",
+            "metadata"
+         ],
+         "data_sensitivity_level":"High",
+         "security_measures_planned":[
+            "encryption_at_rest",
+            "DP"
+         ],
+         "result_sharing_policy":"Aggregated model weights only",
+         "participant_responsibilities":"Keep local data on local nodes; do not export raw images.",
+         "legal_basis_for_processing":"GDPR Article 9(2)(j) — Scientific Research",
+         "third_party_collaboration":null
+      },
+      "expected_data_format":{
+         "expect.storage.files":[
+            "DICOM"
+         ],
+         "expect.schema.json_schema":"Yes",
+         "expect.meta.field_descriptions":"Yes"
+      },
+      "questionnaires":{
+         "onboarding":{
+            "title":"FDP Onboarding Questionnaire",
+            "version":"1.0.0",
+            "sections":[
+               {
+                  "id":"organization",
+                  "title":"About your organisation",
+                  "questions":[
+                     {
+                        "id":"organization.name",
+                        "text":"Organisation name",
+                        "type":"text",
+                        "required":true
+                     },
+                     {
+                        "id":"organization.jurisdictions",
+                        "text":"In which jurisdictions do you operate?",
+                        "type":"multiselect",
+                        "options":[
+                           "EU",
+                           "US",
+                           "UK",
+                           "JP",
+                           "Other"
+                        ]
+                     }
+                  ]
+               },
+               {
+                  "id":"identifiability",
+                  "title":"Data identifiability",
+                  "questions":[
+                     {
+                        "id":"identifiability.processingLevel",
+                        "text":"What level of processing has been applied to identifying fields?",
+                        "type":"radio",
+                        "options":[
+                           "Raw",
+                           "Pseudonymized",
+                           "Anonymized"
+                        ]
+                     }
+                  ]
+               }
+            ]
+         },
+         "data_format":{
+            "title":"Data Format Questionnaire",
+            "version":"1.0.0",
+            "sections":[
+               {
+                  "id":"storage",
+                  "title":"Storage",
+                  "questions":[
+                     {
+                        "id":"storage.files",
+                        "text":"What file formats do you hold?",
+                        "type":"multiselect",
+                        "options":[
+                           "DICOM",
+                           "NIfTI",
+                           "JPEG",
+                           "Other"
+                        ]
+                     }
+                  ]
+               },
+               {
+                  "id":"schema",
+                  "title":"Schema",
+                  "questions":[
+                     {
+                        "id":"schema.json_schema",
+                        "text":"Do you have a JSON Schema for your tabular/metadata layout?",
+                        "type":"radio",
+                        "options":[
+                           "Yes",
+                           "No",
+                           "Partially"
+                        ]
+                     }
+                  ]
+               }
+            ]
+         }
+      }
    },
    "accepted_participants":[
       {
-         "participant_id":"org_hospital_1",
-         "dataset_name":"hospital1-patients",
+         "user_id":7,
+         "username":"dr.rossi",
+         "is_active":true,
+         "joined_at":"2026-04-02T10:15:00Z",
+         "brane_metadata":{
+            "dataset_name":"hospital1-patients"
+         },
          "onboarding_answers":{
-            "identifiability.processingLevel":"Pseudonymized",
-            "securityInfrastructure.networkConnectionPolicy":"ProxyOnly",
-            "securityInfrastructure.auditLoggingRequired":"Yes",
-            "dataGovernance.modelUpdatesAllowed":"AfterDifferentialPrivacy",
-            "dataGovernance.requiresPerRoundApproval":true,
-            "retention.requires_unlearning":"No"
+            "organization.name":"Hospital A",
+            "organization.jurisdictions":[
+               "EU"
+            ],
+            "identifiability.processingLevel":"Pseudonymized"
          },
          "data_format_answers":{
-            "storage.file_format":
-               "CSV"
- 
+            "storage.files":[
+               "DICOM"
+            ],
+            "schema.json_schema":"Yes"
          }
       },
       {
-         "participant_id":"org_hospital_2",
-         "dataset_name":"hospital2-patients",
+         "user_id":9,
+         "username":"dr.tanaka",
+         "is_active":true,
+         "joined_at":"2026-04-05T11:20:00Z",
+         "brane_metadata":{
+            "dataset_name":"tokyo-cohort-2026"
+         },
          "onboarding_answers":{
-            "identifiability.processingLevel":"Pseudonymized",
-            "securityInfrastructure.networkConnectionPolicy":"VPNOnly",
-            "securityInfrastructure.auditLoggingRequired":"Yes",
-            "dataGovernance.modelUpdatesAllowed":"AfterDifferentialPrivacy",
-            "dataGovernance.requiresPerRoundApproval":true,
-            "retention.requires_unlearning":"CaseByCase"
+            "organization.name":"Hospital B",
+            "organization.jurisdictions":[
+               "JP"
+            ],
+            "identifiability.processingLevel":"Anonymized"
          },
          "data_format_answers":{
-            "storage.file_format":
-               "CSV"
-            
+            "storage.files":[
+               "DICOM",
+               "NIfTI"
+            ],
+            "schema.json_schema":"Yes"
          }
       }
    ]

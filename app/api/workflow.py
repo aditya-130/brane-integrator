@@ -1,13 +1,30 @@
-from app.application.config_parser import ConfigParser
-from app.domain.config import IntegratorConfig
-from app.infrastructure.database import get_db
+from app.domain.workflow import Workflow
+from app.infrastructure.database import get_db, engine
 from app.infrastructure.dtos import GenerateWorkflowRequest
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from pydantic import BaseModel
+from app.application.workflow_job_handler import WorkflowJobHandler
+from app.infrastructure.branehub_service import BraneHubService
+from fastapi import APIRouter, BackgroundTasks, Depends
+from sqlmodel import Session
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
-@router.post("")
-def generate_workflow(request: GenerateWorkflowRequest, db_session: Session = Depends(get_db)) -> IntegratorConfig:
-    return ConfigParser(config=request, db_session=db_session).parse()
+
+@router.post("/generate-workflow", status_code=200)
+def generate_workflow(request: GenerateWorkflowRequest, background_tasks: BackgroundTasks, db_session: Session = Depends(get_db)):
+    workflow = Workflow(
+        project_id=request.project_id,
+        cycle_id=request.cycle_id,
+        triggered_at=request.triggered_at,
+    )
+    db_session.add(workflow)
+    db_session.commit()
+    db_session.refresh(workflow)
+
+    def job():
+        with Session(engine) as db:
+            WorkflowJobHandler(db=db, branehub_service=BraneHubService()).run(
+                workflow.workflow_id, request.project_id, request.cycle_id
+            )
+
+    background_tasks.add_task(job)
+    return
