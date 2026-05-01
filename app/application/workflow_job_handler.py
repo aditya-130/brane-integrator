@@ -10,7 +10,7 @@ class WorkflowJobHandler:
         self.branehub_service = branehub_service
         self.config_parser = ConfigParser(db_session=db)
 
-    def run(self, workflow_id: str, project_id: int, cycle_id: int):
+    def handle_generation(self, workflow_id: str, project_id: int, cycle_id: int):
 
         # 1. update workflow status 
         workflow = self.db.get(Workflow, workflow_id)

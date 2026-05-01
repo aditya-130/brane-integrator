@@ -14,6 +14,5 @@ class ProjectConfigRequest (BaseModel):
 
 class GenerateWorkflowRequest(BaseModel):
     schema_version: str
-    project_id: int
     cycle_id: int
     triggered_at: str
