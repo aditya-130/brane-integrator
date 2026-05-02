@@ -27,8 +27,15 @@ class IntegratorConfig(BaseModel):
     workflow: WorkflowSpec
     participants: List[ParticipantPolicy]
 
+
 class InterpretedParticipant(BaseModel):
     brane_node: str
     dataset_name: str
     on_annotation: str
-    flagged: list[str]
+    tag_annotations: List[str] = []
+    flagged: List[str] = []
+
+
+class InterpretedWorkflow(BaseModel):
+    wf_tags: List[str] = []
+    participants: List[InterpretedParticipant]
