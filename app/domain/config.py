@@ -26,3 +26,9 @@ class IntegratorConfig(BaseModel):
     project: ProjectBlock
     workflow: WorkflowSpec
     participants: List[ParticipantPolicy]
+
+class InterpretedParticipant(BaseModel):
+    brane_node: str
+    dataset_name: str
+    on_annotation: str
+    flagged: list[str]

@@ -1,4 +1,6 @@
 from app.application.config_parser import ConfigParser
+from app.application.policy_interpreter import PolicyInterpreter
+from app.application.workflow_generator import WorkflowGenerator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
@@ -9,6 +11,8 @@ class WorkflowJobHandler:
         self.db = db
         self.branehub_service = branehub_service
         self.config_parser = ConfigParser(db_session=db)
+        self.policy_interpreter = PolicyInterpreter()
+        self.workflow_generator = WorkflowGenerator()
 
     def handle_generation(self, workflow_id: str, project_id: int, cycle_id: int):
 
@@ -23,12 +27,19 @@ class WorkflowJobHandler:
 
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)
-        print(integrator_config.model_dump_json(indent=2))
-
-
 
         # 4. interpret policies
+        interpreted = self.policy_interpreter.interpret(integrator_config)
+
         # 5. generate branescript + traceability report
+        branescript = self.workflow_generator.generate(integrator_config, interpreted)
+
         # 6. save to workflow row
+        workflow.branescript = branescript
+        workflow.status = "generated"
+        self.db.add(workflow)
+        self.db.commit()
+
         # 7. upload script to BraneHub
+        self.branehub_service.mock_send_bs_to_branehub(branescript, workflow.project_id, workflow.cycle_id)
         pass
