@@ -6,7 +6,7 @@ PARTICIPANT_REGISTRY = {
 }
 
 WORKFLOW_REGISTRY = {
-    "data_sensitivity": lambda v: f'#![wf-tag("sensitivity.{v}")]',
+    "data_sensitivity": lambda v: f'#![wf_tag("sensitivity.{v}")]',
 }
 
 SKIP_FIELDS = {"dataset_name"}

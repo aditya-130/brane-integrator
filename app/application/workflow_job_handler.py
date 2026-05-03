@@ -1,3 +1,7 @@
+import subprocess
+import tempfile
+import re
+import os
 from app.application.config_parser import ConfigParser
 from app.application.policy_interpreter import PolicyInterpreter
 from app.application.workflow_generator import WorkflowGenerator
@@ -16,7 +20,7 @@ class WorkflowJobHandler:
 
     def handle_generation(self, workflow_id: str, project_id: int, cycle_id: int):
 
-        # 1. update workflow status 
+        # 1. update workflow status
         workflow = self.db.get(Workflow, workflow_id)
         workflow.status = "generating"
         self.db.add(workflow)
@@ -41,5 +45,67 @@ class WorkflowJobHandler:
         self.db.commit()
 
         # 7. upload script to BraneHub
-        self.branehub_service.mock_send_bs_to_branehub(branescript, workflow.project_id, workflow.cycle_id)
-        pass
+        self.branehub_service.mock_send_bs_to_branehub(
+            branescript,
+            workflow.project_id,
+            workflow.cycle_id,
+        )
+
+    def handle_execution(self, workflow_id: str) -> str:
+
+        # 1. update workflow status
+        workflow = self.db.get(Workflow, workflow_id)
+        workflow.status = "executing"
+        self.db.add(workflow)
+        self.db.commit()
+
+        # 2. strip tag annotations before submitting to Brane
+        #
+        # The generated BraneScript (stored in DB) includes #[tag()] and #![wf_tag()]
+        # annotations produced by the PolicyInterpreter. These constructs are correct
+        # per the Brane policy design and form part of the traceability report.
+        #
+        # ROOT CAUSE (Brane nightly 3.0.0-nightly_7175fba8 bug):
+        # The eFLINT base ontology defines tag as a 2-component fact:
+        #   Fact tag Identified by user * string.   (brane-chk/policy/metadata.eflint)
+        # However, the Brane Rust checker (brane-chk/src/workflow/eflint.rs:74)
+        # serialises tag annotations as a 1-component assertion:
+        #   +tag("identifiability.Pseudonymized")   <- missing the user component
+        # The eFLINT engine rejects this with "elements of tag have 2 components,
+        # 1 given", causing the checker to return an internal gRPC error, which
+        # causes the planner to abort with "Failed to plan workflow".
+        #
+        # Workaround: strip #[tag()] and #![wf_tag()] lines before writing the
+        # temp file submitted to Brane. The full annotated script remains in the DB.
+        executable_script = "\n".join(
+            line for line in workflow.branescript.splitlines()
+            if not line.startswith("#[tag(") and not line.startswith("#![wf_tag(")
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".bs", mode="w", delete=False) as f:
+            f.write(executable_script)
+            tmpfile = f.name
+
+        # 3. run brane CLI
+        try:
+            proc = subprocess.run(
+                ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        finally:
+            os.unlink(tmpfile)
+
+        # 4. parse result and update status
+        match = re.search(r"Workflow returned value '(.+)'", proc.stdout)
+        if proc.returncode == 0 and match:
+            workflow.status = "completed"
+            self.db.add(workflow)
+            self.db.commit()
+            return match.group(1)
+        else:
+            workflow.status = "failed"
+            self.db.add(workflow)
+            self.db.commit()
+            raise RuntimeError(proc.stderr or proc.stdout or "brane exited with no output")

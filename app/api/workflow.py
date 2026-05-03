@@ -3,8 +3,8 @@ from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
 from app.infrastructure.dtos import GenerateWorkflowRequest
 from app.application.workflow_job_handler import WorkflowJobHandler
-from fastapi import APIRouter, BackgroundTasks, Depends
-from sqlmodel import Session
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlmodel import Session, select
 
 router = APIRouter(prefix="/projects", tags=["workflows"])
 
@@ -16,14 +16,54 @@ def generate_workflow(
     background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
 ):
-    workflow = Workflow(project_id=project_id, cycle_id=request.cycle_id, triggered_at=request.triggered_at)
+    workflow = Workflow(
+        project_id=project_id,
+        cycle_id=request.cycle_id,
+        triggered_at=request.triggered_at,
+    )
     db_session.add(workflow)
     db_session.commit()
     db_session.refresh(workflow)
 
     def job():
         with Session(engine) as db:
-            WorkflowJobHandler(db=db, branehub_service=BraneHubService(),).handle_generation(workflow.workflow_id, project_id, request.cycle_id)
+            WorkflowJobHandler(
+                db=db,
+                branehub_service=BraneHubService(),
+            ).handle_generation(
+                workflow.workflow_id,
+                project_id,
+                request.cycle_id,
+            )
 
     background_tasks.add_task(job)
     return
+
+
+@router.post("/{project_id}/workflows/run")
+def run_workflow(
+    project_id: int,
+    db_session: Session = Depends(get_db),
+):
+    workflow = db_session.exec(
+        select(Workflow)
+        .where(
+            Workflow.project_id == project_id,
+            Workflow.status == "generated",
+        )
+        .order_by(Workflow.created_at.desc())
+    ).first()
+
+    if not workflow:
+        raise HTTPException(
+            status_code=404,
+            detail="No generated workflow found for this project",
+        )
+
+    handler = WorkflowJobHandler(
+        db=db_session,
+        branehub_service=BraneHubService(),
+    )
+    result = handler.handle_execution(workflow.workflow_id)
+
+    return {"status": "completed", "result": result}

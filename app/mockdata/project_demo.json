@@ -158,7 +158,7 @@
          "is_active":true,
          "joined_at":"2026-04-05T11:20:00Z",
          "brane_metadata":{
-            "dataset_name":"tokyo-cohort-2026"
+            "dataset_name":"hospital2-patients"
          },
          "onboarding_answers":{
             "organization.name":"Hospital B",
