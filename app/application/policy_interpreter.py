@@ -2,6 +2,7 @@ from app.domain.config import IntegratorConfig, InterpretedParticipant, Interpre
 
 PARTICIPANT_REGISTRY = {
     "brane_node": lambda v: f'#[on("{v}")]',
+    "dataset_name": lambda v: f'new Data {{ name := "{v}" }}',
     "identifiability": lambda v: f'#[tag("identifiability.{v}")]',
 }
 
@@ -9,8 +10,7 @@ WORKFLOW_REGISTRY = {
     "data_sensitivity": lambda v: f'#![wf_tag("sensitivity.{v}")]',
 }
 
-SKIP_FIELDS = {"dataset_name"}
-
+PARTICIPANT_SKIP_FIELDS = {"user_id"}
 WF_SKIP_FIELDS = {"project_id", "study_objective", "legal_basis"}
 
 
@@ -26,16 +26,19 @@ class PolicyInterpreter:
         participants = []
         for participant in config.participants:
             on_annotation = None
+            dataset_name = None
             tag_annotations = []
             flagged = []
 
             for field, value in participant.model_dump().items():
-                if field in SKIP_FIELDS or value is None:
+                if field in PARTICIPANT_SKIP_FIELDS or value is None:
                     continue
                 if field in PARTICIPANT_REGISTRY:
                     construct = PARTICIPANT_REGISTRY[field](value)
                     if field == "brane_node":
                         on_annotation = construct
+                    elif field == "dataset_name":
+                        dataset_name = construct
                     else:
                         tag_annotations.append(construct)
                 else:
@@ -44,7 +47,7 @@ class PolicyInterpreter:
             participants.append(
                 InterpretedParticipant(
                     brane_node=participant.brane_node,
-                    dataset_name=participant.dataset_name,
+                    dataset_name=dataset_name,
                     on_annotation=on_annotation,
                     tag_annotations=tag_annotations,
                     flagged=flagged,

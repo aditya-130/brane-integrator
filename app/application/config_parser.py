@@ -61,6 +61,7 @@ class ConfigParser:
 
             policies.append(
                 ParticipantPolicy(
+                    user_id=user_id,
                     brane_node=node_mapping.brane_node,
                     dataset_name=participant["brane_metadata"]["dataset_name"],
                     identifiability=participant["onboarding_answers"].get(

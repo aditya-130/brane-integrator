@@ -1,3 +1,4 @@
+import json
 import subprocess
 import tempfile
 import re
@@ -5,6 +6,7 @@ import os
 from app.application.config_parser import ConfigParser
 from app.application.policy_interpreter import PolicyInterpreter
 from app.application.workflow_generator import WorkflowGenerator
+from app.application.validator import Validator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
@@ -17,6 +19,7 @@ class WorkflowJobHandler:
         self.config_parser = ConfigParser(db_session=db)
         self.policy_interpreter = PolicyInterpreter()
         self.workflow_generator = WorkflowGenerator()
+        self.validator = Validator()
 
     def handle_generation(self, workflow_id: str, project_id: int, cycle_id: int):
 
@@ -35,18 +38,33 @@ class WorkflowJobHandler:
         # 4. interpret policies
         interpreted = self.policy_interpreter.interpret(integrator_config)
 
-        # 5. generate branescript + traceability report
+        # 5. generate branescript
         branescript = self.workflow_generator.generate(integrator_config, interpreted)
 
-        # 6. save to workflow row
+        # 6. validate + generate traceability report
+        validation_result = self.validator.validate(branescript, integrator_config, interpreted)
+        traceability_report = self.validator.generate_traceability_report(
+            branescript, integrator_config, interpreted
+        )
+
+        if not validation_result.passed:
+            workflow.status = "failed"
+            self.db.add(workflow)
+            self.db.commit()
+            failed_rules = [r.rule for r in validation_result.rules if not r.passed]
+            raise RuntimeError(f"Validation failed: {failed_rules}")
+
+        # 7. save to workflow row
         workflow.branescript = branescript
+        workflow.traceability_report = json.dumps(traceability_report)
         workflow.status = "generated"
         self.db.add(workflow)
         self.db.commit()
 
-        # 7. upload script to BraneHub
+        # 8. upload script to BraneHub
         self.branehub_service.mock_send_bs_to_branehub(
             branescript,
+            traceability_report,
             workflow.project_id,
             workflow.cycle_id,
         )

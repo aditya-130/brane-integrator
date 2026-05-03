@@ -17,7 +17,7 @@ class WorkflowGenerator:
 
         # data references
         for i, p in enumerate(interpreted.participants, start=1):
-            lines.append(f'let data_{i} := new Data {{ name := "{p.dataset_name}" }};')
+            lines.append(f"let data_{i} := {p.dataset_name};")
         lines.append("")
 
         # local function calls per participant

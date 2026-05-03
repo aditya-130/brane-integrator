@@ -17,6 +17,7 @@ class WorkflowSpec(BaseModel):
 
 
 class ParticipantPolicy(BaseModel):
+    user_id: int
     brane_node: str
     dataset_name: str
     identifiability: Optional[str] = None
@@ -39,3 +40,13 @@ class InterpretedParticipant(BaseModel):
 class InterpretedWorkflow(BaseModel):
     wf_tags: List[str] = []
     participants: List[InterpretedParticipant]
+
+class RuleResult(BaseModel):
+    rule: str
+    passed: bool
+    message: Optional[str] = None
+
+
+class ValidationResult(BaseModel):
+    passed: bool
+    rules: list[RuleResult]
