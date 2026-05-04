@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import re
 import os
+import time
 from app.application.config_parser import ConfigParser
 from app.application.policy_interpreter import PolicyInterpreter
 from app.application.workflow_generator import WorkflowGenerator
@@ -30,7 +31,7 @@ class WorkflowJobHandler:
         self.db.commit()
 
         # 2. fetch raw project config from BraneHub
-        raw = self.branehub_service.fetch_mock_project_config(project_id)
+        raw = self.branehub_service.fetch_project_config(project_id)
 
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)
@@ -105,6 +106,7 @@ class WorkflowJobHandler:
             tmpfile = f.name
 
         # 3. run brane CLI
+        start_time = time.time()
         try:
             proc = subprocess.run(
                 ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
@@ -116,14 +118,51 @@ class WorkflowJobHandler:
             os.unlink(tmpfile)
 
         # 4. parse result and update status
+        duration = int(time.time() - start_time)
         match = re.search(r"Workflow returned value '(.+)'", proc.stdout)
         if proc.returncode == 0 and match:
-            workflow.status = "completed"
-            self.db.add(workflow)
-            self.db.commit()
-            return match.group(1)
+            try:
+                result = json.loads(match.group(1))
+            except json.JSONDecodeError:
+                result = None
+
+            if result:
+                workflow.status = "completed"
+                self.db.add(workflow)
+                self.db.commit()
+                self.branehub_service.mock_send_completed(
+                    project_id=workflow.project_id,
+                    cycle_id=workflow.cycle_id,
+                    script_version=workflow.script_version,
+                    status="completed_success",
+                    result=result,
+                    error=None,
+                    duration_seconds=duration,
+                )
+            else:
+                workflow.status = "failed"
+                self.db.add(workflow)
+                self.db.commit()
+                self.branehub_service.mock_send_completed(
+                    project_id=workflow.project_id,
+                    cycle_id=workflow.cycle_id,
+                    script_version=workflow.script_version,
+                    status="completed_failed",
+                    result=None,
+                    error="Brane output could not be parsed as JSON",
+                    duration_seconds=duration,
+                )
         else:
+            error = proc.stderr or proc.stdout or "brane exited with no output"
             workflow.status = "failed"
             self.db.add(workflow)
             self.db.commit()
-            raise RuntimeError(proc.stderr or proc.stdout or "brane exited with no output")
+            self.branehub_service.mock_send_completed(
+                project_id=workflow.project_id,
+                cycle_id=workflow.cycle_id,
+                script_version=workflow.script_version,
+                status="completed_failed",
+                result=None,
+                error=error,
+                duration_seconds=duration,
+            )

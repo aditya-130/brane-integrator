@@ -16,6 +16,15 @@ def generate_workflow(
     background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
 ):
+    existing = db_session.exec(
+        select(Workflow).where(
+            Workflow.project_id == project_id,
+            Workflow.cycle_id == request.cycle_id,
+        )
+    ).first()
+    if existing:
+        return
+
     workflow = Workflow(
         project_id=project_id,
         cycle_id=request.cycle_id,
