@@ -19,6 +19,34 @@ class BraneHubService:
         with open(path) as f:
             return json.load(f)
 
+    def send_script_to_branehub(
+        self,
+        branescript: str,
+        traceability_report: str,
+        project_id: int,
+        cycle_id: int,
+        participants_used: list[int],
+    ) -> int:
+        import uuid
+        response = httpx.post(
+            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/script",
+            headers={
+                "X-API-Key": settings.BRANE_INTEGRATOR_API_KEY,
+                "Content-Type": "application/json",
+                "Idempotency-Key": str(uuid.uuid4()),
+            },
+            json={
+                "schema_version": "1.0",
+                "cycle_id": cycle_id,
+                "script_content": branescript,
+                "traceability_report": traceability_report,
+                "integrator_metadata": {"participants_used": participants_used},
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()["version"]
+
     def mock_send_bs_to_branehub(
         self,
         branescript: str,
@@ -29,6 +57,38 @@ class BraneHubService:
         print(f"Uploading to BraneHub for project {project_id}, cycle {cycle_id}...")
         print("BraneScript:\n", branescript)
         print("Traceability report:\n", json.dumps(traceability_report, indent=2))
+
+    def send_completed(
+        self,
+        project_id: int,
+        cycle_id: int,
+        script_version: int,
+        status: str,
+        result: dict | None,
+        error: str | None,
+        duration_seconds: int,
+    ):
+        body = {
+            "schema_version": "1.0",
+            "cycle_id": cycle_id,
+            "script_version": script_version,
+            "status": status,
+            "error": error,
+            "metrics": {"duration_seconds": duration_seconds},
+        }
+        if result is not None:
+            body["result"] = result
+        response = httpx.post(
+            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/completed",
+            headers={
+                "X-API-Key": settings.BRANE_INTEGRATOR_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=10,
+        )
+        if not response.is_success:
+            print(f"[send_completed] BraneHub returned {response.status_code}: {response.text}")
 
     def mock_send_completed(
         self,

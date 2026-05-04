@@ -22,7 +22,7 @@ def generate_workflow(
             Workflow.cycle_id == request.cycle_id,
         )
     ).first()
-    if existing:
+    if existing and existing.status != "pending":
         return
 
     workflow = Workflow(

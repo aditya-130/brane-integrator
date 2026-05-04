@@ -63,12 +63,17 @@ class WorkflowJobHandler:
         self.db.commit()
 
         # 8. upload script to BraneHub
-        self.branehub_service.mock_send_bs_to_branehub(
-            branescript,
-            traceability_report,
-            workflow.project_id,
-            workflow.cycle_id,
+        participants_used = [p.user_id for p in integrator_config.participants]
+        script_version = self.branehub_service.send_script_to_branehub(
+            branescript=branescript,
+            traceability_report=json.dumps(traceability_report),
+            project_id=workflow.project_id,
+            cycle_id=workflow.cycle_id,
+            participants_used=participants_used,
         )
+        workflow.script_version = script_version
+        self.db.add(workflow)
+        self.db.commit()
 
     def handle_execution(self, workflow_id: str) -> str:
 
@@ -130,7 +135,7 @@ class WorkflowJobHandler:
                 workflow.status = "completed"
                 self.db.add(workflow)
                 self.db.commit()
-                self.branehub_service.mock_send_completed(
+                self.branehub_service.send_completed(
                     project_id=workflow.project_id,
                     cycle_id=workflow.cycle_id,
                     script_version=workflow.script_version,
@@ -143,7 +148,7 @@ class WorkflowJobHandler:
                 workflow.status = "failed"
                 self.db.add(workflow)
                 self.db.commit()
-                self.branehub_service.mock_send_completed(
+                self.branehub_service.send_completed(
                     project_id=workflow.project_id,
                     cycle_id=workflow.cycle_id,
                     script_version=workflow.script_version,
@@ -157,7 +162,7 @@ class WorkflowJobHandler:
             workflow.status = "failed"
             self.db.add(workflow)
             self.db.commit()
-            self.branehub_service.mock_send_completed(
+            self.branehub_service.send_completed(
                 project_id=workflow.project_id,
                 cycle_id=workflow.cycle_id,
                 script_version=workflow.script_version,
