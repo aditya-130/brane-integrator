@@ -16,3 +16,10 @@ class GenerateWorkflowRequest(BaseModel):
     schema_version: str
     cycle_id: int
     triggered_at: str
+
+class RunWorkflowRequest(BaseModel):
+    schema_version: str
+    cycle_id: int
+    script_version: int
+    decided_at: str
+    decided_by: str

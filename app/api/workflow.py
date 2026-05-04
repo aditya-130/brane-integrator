@@ -1,7 +1,7 @@
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
-from app.infrastructure.dtos import GenerateWorkflowRequest
+from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest
 from app.application.workflow_job_handler import WorkflowJobHandler
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
@@ -40,30 +40,38 @@ def generate_workflow(
     return
 
 
-@router.post("/{project_id}/workflows/run")
+@router.post("/{project_id}/workflows/run", status_code=200)
 def run_workflow(
     project_id: int,
+    request: RunWorkflowRequest,
+    background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
 ):
     workflow = db_session.exec(
         select(Workflow)
         .where(
             Workflow.project_id == project_id,
+            Workflow.cycle_id == request.cycle_id,
             Workflow.status == "generated",
         )
-        .order_by(Workflow.created_at.desc())
     ).first()
 
     if not workflow:
         raise HTTPException(
             status_code=404,
-            detail="No generated workflow found for this project",
+            detail="No generated workflow found for this project/cycle",
         )
 
-    handler = WorkflowJobHandler(
-        db=db_session,
-        branehub_service=BraneHubService(),
-    )
-    result = handler.handle_execution(workflow.workflow_id)
+    workflow.script_version = request.script_version
+    db_session.add(workflow)
+    db_session.commit()
 
-    return {"status": "completed", "result": result}
+    def job():
+        with Session(engine) as db:
+            WorkflowJobHandler(
+                db=db,
+                branehub_service=BraneHubService(),
+            ).handle_execution(workflow.workflow_id)
+
+    background_tasks.add_task(job)
+    return
