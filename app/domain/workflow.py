@@ -9,6 +9,7 @@ class Workflow(SQLModel, table=True):
     project_id: int
     cycle_id: int
     triggered_at: str
+    script_version: Optional[int] = None
     branescript: Optional[str] = None
     traceability_report: Optional[str] = None
     status: str = "pending" # pending | generating | generated | approved | executing | completed | failed | invalidated
