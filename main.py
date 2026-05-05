@@ -1,4 +1,5 @@
 import secrets
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.infrastructure.database import init_db, engine
@@ -19,6 +20,19 @@ async def verify_api_key(request: Request, call_next):
         )
     return await call_next(request)
 
+def _cycle_terminal_state(project_id: int) -> str | None:
+    try:
+        response = httpx.get(
+            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}",
+            headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
+            timeout=5,
+        )
+        if response.status_code == 200:
+            return response.json().get("cycle_terminal_state")
+    except Exception as e:
+        print(f"[startup] could not reach BraneHub for project {project_id}: {e}")
+    return None
+
 @app.on_event("startup")
 def on_startup():
     print("Starting Brane Integrator...")
@@ -28,8 +42,13 @@ def on_startup():
             select(Workflow).where(Workflow.status.in_(["generating", "executing"]))
         ).all()
         for w in stuck:
-            print(f"[startup] resetting stuck workflow {w.workflow_id} ({w.status} → pending)")
-            w.status = "pending"
+            terminal = _cycle_terminal_state(w.project_id)
+            if terminal is not None:
+                print(f"[startup] cycle already ended on BraneHub ({terminal}) — marking workflow {w.workflow_id} failed")
+                w.status = "failed"
+            else:
+                print(f"[startup] cycle still active — resetting workflow {w.workflow_id} ({w.status} → pending)")
+                w.status = "pending"
             db.add(w)
         db.commit()
 
