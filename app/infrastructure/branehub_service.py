@@ -26,8 +26,12 @@ class BraneHubService:
         project_id: int,
         cycle_id: int,
         participants_used: list[int],
+        note: str | None = None,
     ) -> int:
         import uuid
+        integrator_metadata: dict = {"participants_used": participants_used}
+        if note is not None:
+            integrator_metadata["note"] = note
         response = httpx.post(
             f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/script",
             headers={
@@ -40,7 +44,7 @@ class BraneHubService:
                 "cycle_id": cycle_id,
                 "script_content": branescript,
                 "traceability_report": traceability_report,
-                "integrator_metadata": {"participants_used": participants_used},
+                "integrator_metadata": integrator_metadata,
             },
             timeout=10,
         )

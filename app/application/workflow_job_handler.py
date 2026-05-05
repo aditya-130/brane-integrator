@@ -12,6 +12,8 @@ from app.application.validator import Validator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
+from app.infrastructure.llm_service import LlmService
+from app.application.prompts import NOTE_GENERATION_SYSTEM, NOTE_GENERATION_USER
 
 # Keyed by workflow_id. Populated when a Brane subprocess starts; removed when it exits.
 _running_processes: dict[str, subprocess.Popen] = {}
@@ -21,9 +23,10 @@ _aborted_workflows: set[str] = set()
 
 
 class WorkflowJobHandler:
-    def __init__(self, db: Session, branehub_service: BraneHubService):
+    def __init__(self, db: Session, branehub_service: BraneHubService, llm_service: LlmService | None = None):
         self.db = db
         self.branehub_service = branehub_service
+        self.llm_service = llm_service
         self.config_parser = ConfigParser(db_session=db)
         self.policy_interpreter = PolicyInterpreter()
         self.workflow_generator = WorkflowGenerator()
@@ -69,7 +72,10 @@ class WorkflowJobHandler:
         self.db.add(workflow)
         self.db.commit()
 
-        # 8. upload script to BraneHub
+        # 8. generate plain-language note for the owner review UI
+        note = self._generate_note(branescript, json.dumps(traceability_report))
+
+        # 9. upload script to BraneHub
         participants_used = [p.user_id for p in integrator_config.participants]
         script_version = self.branehub_service.send_script_to_branehub(
             branescript=branescript,
@@ -77,6 +83,7 @@ class WorkflowJobHandler:
             project_id=workflow.project_id,
             cycle_id=workflow.cycle_id,
             participants_used=participants_used,
+            note=note,
         )
         workflow.script_version = script_version
         self.db.add(workflow)
@@ -221,6 +228,15 @@ class WorkflowJobHandler:
             duration_seconds=duration,
             abort_acknowledged=True,
         )
+
+    def _generate_note(self, branescript: str, traceability_report: str) -> str | None:
+        if self.llm_service is None:
+            return None
+        user_prompt = NOTE_GENERATION_USER.format(
+            branescript=branescript,
+            traceability_report=traceability_report,
+        )
+        return self.llm_service.complete(NOTE_GENERATION_SYSTEM, user_prompt)
 
     def handle_dismissed(self, workflow_id: str):
         # Signal handle_execution to not call send_completed, then kill the process

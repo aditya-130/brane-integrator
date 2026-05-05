@@ -2,6 +2,7 @@ from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
 from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest, RejectWorkflowRequest, AbortWorkflowRequest, DismissedWorkflowRequest
+from app.infrastructure.llm_service import OpenAILlmService
 from app.application.workflow_job_handler import WorkflowJobHandler
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
@@ -39,6 +40,7 @@ def generate_workflow(
             WorkflowJobHandler(
                 db=db,
                 branehub_service=BraneHubService(),
+                llm_service=OpenAILlmService(),
             ).handle_generation(
                 workflow.workflow_id,
                 project_id,
@@ -80,6 +82,7 @@ def reject_workflow(
             WorkflowJobHandler(
                 db=db,
                 branehub_service=BraneHubService(),
+                llm_service=OpenAILlmService(),
             ).handle_generation(
                 workflow.workflow_id,
                 project_id,
