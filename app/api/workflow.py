@@ -1,7 +1,7 @@
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
-from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest
+from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest, RejectWorkflowRequest
 from app.application.workflow_job_handler import WorkflowJobHandler
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
@@ -33,6 +33,47 @@ def generate_workflow(
     db_session.add(workflow)
     db_session.commit()
     db_session.refresh(workflow)
+
+    def job():
+        with Session(engine) as db:
+            WorkflowJobHandler(
+                db=db,
+                branehub_service=BraneHubService(),
+            ).handle_generation(
+                workflow.workflow_id,
+                project_id,
+                request.cycle_id,
+            )
+
+    background_tasks.add_task(job)
+    return
+
+
+@router.post("/{project_id}/workflows/reject", status_code=200)
+def reject_workflow(
+    project_id: int,
+    request: RejectWorkflowRequest,
+    background_tasks: BackgroundTasks,
+    db_session: Session = Depends(get_db),
+):
+    # Idempotency: only regenerate if this exact script_version is still awaiting review
+    workflow = db_session.exec(
+        select(Workflow).where(
+            Workflow.project_id == project_id,
+            Workflow.cycle_id == request.cycle_id,
+            Workflow.script_version == request.script_version,
+            Workflow.status == "generated",
+        )
+    ).first()
+
+    if not workflow:
+        # Duplicate rejection or unknown state — safe to ignore
+        return
+
+    # Reset so handle_generation can re-run the full pipeline
+    workflow.status = "pending"
+    db_session.add(workflow)
+    db_session.commit()
 
     def job():
         with Session(engine) as db:

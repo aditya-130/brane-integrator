@@ -23,3 +23,11 @@ class RunWorkflowRequest(BaseModel):
     script_version: int
     decided_at: str
     decided_by: str
+
+class RejectWorkflowRequest(BaseModel):
+    schema_version: str
+    cycle_id: int
+    script_version: int
+    rejection_reason: str
+    decided_at: str
+    decided_by: str
