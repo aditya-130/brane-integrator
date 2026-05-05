@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class ParticipantNodeMappingRequest(BaseModel):
     user_id: int
@@ -31,3 +31,22 @@ class RejectWorkflowRequest(BaseModel):
     rejection_reason: str
     decided_at: str
     decided_by: str
+
+class AbortWorkflowRequest(BaseModel):
+    schema_version: str
+    project_id: int
+    cycle_id: int
+    script_version: int
+    reason: str
+    requested_at: str
+    requested_by: str
+
+class DismissedWorkflowRequest(BaseModel):
+    schema_version: str
+    project_id: int
+    cycle_id: int
+    script_version: Optional[int] = None
+    reason: Optional[str] = None
+    dismissed_at: str
+    dismissed_by: str
+    dismissed_by_role: str

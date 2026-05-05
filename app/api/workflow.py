@@ -1,7 +1,7 @@
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
-from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest, RejectWorkflowRequest
+from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest, RejectWorkflowRequest, AbortWorkflowRequest, DismissedWorkflowRequest
 from app.application.workflow_job_handler import WorkflowJobHandler
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
@@ -122,6 +122,72 @@ def run_workflow(
                 db=db,
                 branehub_service=BraneHubService(),
             ).handle_execution(workflow.workflow_id)
+
+    background_tasks.add_task(job)
+    return
+
+
+@router.post("/{project_id}/abort", status_code=200)
+def abort_workflow(
+    project_id: int,
+    request: AbortWorkflowRequest,
+    background_tasks: BackgroundTasks,
+    db_session: Session = Depends(get_db),
+):
+    # Idempotency: only act if this (cycle_id, script_version) is currently executing
+    workflow = db_session.exec(
+        select(Workflow).where(
+            Workflow.project_id == project_id,
+            Workflow.cycle_id == request.cycle_id,
+            Workflow.script_version == request.script_version,
+            Workflow.status == "executing",
+        )
+    ).first()
+
+    if not workflow:
+        return
+
+    def job():
+        with Session(engine) as db:
+            WorkflowJobHandler(
+                db=db,
+                branehub_service=BraneHubService(),
+            ).handle_abort(
+                workflow.workflow_id,
+                project_id,
+                request.cycle_id,
+                request.script_version,
+            )
+
+    background_tasks.add_task(job)
+    return
+
+
+@router.post("/{project_id}/workflows/dismissed", status_code=200)
+def dismissed_workflow(
+    project_id: int,
+    request: DismissedWorkflowRequest,
+    background_tasks: BackgroundTasks,
+    db_session: Session = Depends(get_db),
+):
+    # Idempotency: find any active workflow for this (project_id, cycle_id)
+    workflow = db_session.exec(
+        select(Workflow).where(
+            Workflow.project_id == project_id,
+            Workflow.cycle_id == request.cycle_id,
+            Workflow.status.in_(["pending", "generating", "generated", "executing"]),
+        )
+    ).first()
+
+    if not workflow:
+        return
+
+    def job():
+        with Session(engine) as db:
+            WorkflowJobHandler(
+                db=db,
+                branehub_service=BraneHubService(),
+            ).handle_dismissed(workflow.workflow_id)
 
     background_tasks.add_task(job)
     return

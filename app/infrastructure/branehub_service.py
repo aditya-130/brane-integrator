@@ -67,14 +67,18 @@ class BraneHubService:
         result: dict | None,
         error: str | None,
         duration_seconds: int,
+        abort_acknowledged: bool = False,
     ):
+        metrics: dict = {"duration_seconds": duration_seconds}
+        if abort_acknowledged:
+            metrics["abort_acknowledged"] = True
         body = {
             "schema_version": "1.0",
             "cycle_id": cycle_id,
             "script_version": script_version,
             "status": status,
             "error": error,
-            "metrics": {"duration_seconds": duration_seconds},
+            "metrics": metrics,
         }
         if result is not None:
             body["result"] = result

@@ -4,6 +4,7 @@ import tempfile
 import re
 import os
 import time
+from datetime import datetime, timezone
 from app.application.config_parser import ConfigParser
 from app.application.policy_interpreter import PolicyInterpreter
 from app.application.workflow_generator import WorkflowGenerator
@@ -11,6 +12,12 @@ from app.application.validator import Validator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
+
+# Keyed by workflow_id. Populated when a Brane subprocess starts; removed when it exits.
+_running_processes: dict[str, subprocess.Popen] = {}
+# workflow_ids that were externally stopped (abort/dismissed). handle_execution checks this
+# after communicate() returns to decide whether to call send_completed itself.
+_aborted_workflows: set[str] = set()
 
 
 class WorkflowJobHandler:
@@ -80,6 +87,7 @@ class WorkflowJobHandler:
         # 1. update workflow status
         workflow = self.db.get(Workflow, workflow_id)
         workflow.status = "executing"
+        workflow.executed_at = datetime.now(timezone.utc)
         self.db.add(workflow)
         self.db.commit()
 
@@ -110,21 +118,32 @@ class WorkflowJobHandler:
             f.write(executable_script)
             tmpfile = f.name
 
-        # 3. run brane CLI
+        # 3. run brane CLI — Popen so handle_abort/handle_dismissed can kill the process
         start_time = time.time()
+        proc = subprocess.Popen(
+            ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        _running_processes[workflow_id] = proc
         try:
-            proc = subprocess.run(
-                ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
+            stdout, stderr = proc.communicate(timeout=120)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
         finally:
+            _running_processes.pop(workflow_id, None)
             os.unlink(tmpfile)
 
-        # 4. parse result and update status
+        # 4. if an external stop (abort/dismissed) killed the process, hand off to that handler
+        if proc.returncode < 0 and workflow_id in _aborted_workflows:
+            _aborted_workflows.discard(workflow_id)
+            return
+
+        # 5. parse result and update status
         duration = int(time.time() - start_time)
-        match = re.search(r"Workflow returned value '(.+)'", proc.stdout)
+        match = re.search(r"Workflow returned value '(.+)'", stdout)
         if proc.returncode == 0 and match:
             try:
                 result = json.loads(match.group(1))
@@ -158,7 +177,7 @@ class WorkflowJobHandler:
                     duration_seconds=duration,
                 )
         else:
-            error = proc.stderr or proc.stdout or "brane exited with no output"
+            error = stderr or stdout or "brane exited with no output"
             workflow.status = "failed"
             self.db.add(workflow)
             self.db.commit()
@@ -171,3 +190,48 @@ class WorkflowJobHandler:
                 error=error,
                 duration_seconds=duration,
             )
+
+    def handle_abort(self, workflow_id: str, project_id: int, cycle_id: int, script_version: int):
+        workflow = self.db.get(Workflow, workflow_id)
+        duration = 0
+        if workflow and workflow.executed_at:
+            executed_at = workflow.executed_at
+            if executed_at.tzinfo is None:
+                executed_at = executed_at.replace(tzinfo=timezone.utc)
+            duration = int((datetime.now(timezone.utc) - executed_at).total_seconds())
+
+        # Signal handle_execution to not call send_completed, then kill the process
+        _aborted_workflows.add(workflow_id)
+        proc = _running_processes.get(workflow_id)
+        if proc and proc.poll() is None:
+            proc.terminate()
+
+        if workflow:
+            workflow.status = "failed"
+            self.db.add(workflow)
+            self.db.commit()
+
+        self.branehub_service.send_completed(
+            project_id=project_id,
+            cycle_id=cycle_id,
+            script_version=script_version,
+            status="aborted",
+            result=None,
+            error=None,
+            duration_seconds=duration,
+            abort_acknowledged=True,
+        )
+
+    def handle_dismissed(self, workflow_id: str):
+        # Signal handle_execution to not call send_completed, then kill the process
+        _aborted_workflows.add(workflow_id)
+        proc = _running_processes.get(workflow_id)
+        if proc and proc.poll() is None:
+            proc.terminate()
+
+        workflow = self.db.get(Workflow, workflow_id)
+        if workflow:
+            workflow.status = "failed"
+            self.db.add(workflow)
+            self.db.commit()
+        # Do NOT call send_completed — cycle is abandoned on BraneHub side
