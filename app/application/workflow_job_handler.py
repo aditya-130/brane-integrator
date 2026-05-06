@@ -6,14 +6,15 @@ import os
 import time
 from datetime import datetime, timezone
 from app.application.config_parser import ConfigParser
+from app.application.free_text_extractor import FreeTextExtractor
 from app.application.policy_interpreter import PolicyInterpreter
+from app.application.prompt_builder import PromptBuilder
 from app.application.workflow_generator import WorkflowGenerator
 from app.application.validator import Validator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.llm_service import LlmService
-from app.application.prompts import NOTE_GENERATION_SYSTEM, NOTE_GENERATION_USER
 
 # Keyed by workflow_id. Populated when a Brane subprocess starts; removed when it exits.
 _running_processes: dict[str, subprocess.Popen] = {}
@@ -28,7 +29,9 @@ class WorkflowJobHandler:
         self.branehub_service = branehub_service
         self.llm_service = llm_service
         self.config_parser = ConfigParser(db_session=db)
+        self.free_text_extractor = FreeTextExtractor()
         self.policy_interpreter = PolicyInterpreter()
+        self.prompt_builder = PromptBuilder()
         self.workflow_generator = WorkflowGenerator()
         self.validator = Validator()
 
@@ -45,6 +48,9 @@ class WorkflowJobHandler:
 
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)
+
+        # 3.5 extract policy claims from free-text fields (RQ3)
+        integrator_config = self.free_text_extractor.extract(integrator_config, self.llm_service)
 
         # 4. interpret policies
         interpreted = self.policy_interpreter.interpret(integrator_config)
@@ -232,11 +238,8 @@ class WorkflowJobHandler:
     def _generate_note(self, branescript: str, traceability_report: str) -> str | None:
         if self.llm_service is None:
             return None
-        user_prompt = NOTE_GENERATION_USER.format(
-            branescript=branescript,
-            traceability_report=traceability_report,
-        )
-        return self.llm_service.complete(NOTE_GENERATION_SYSTEM, user_prompt)
+        system, user = self.prompt_builder.build_note_prompt(branescript, traceability_report)
+        return self.llm_service.complete(system, user)
 
     def handle_dismissed(self, workflow_id: str):
         # Signal handle_execution to not call send_completed, then kill the process

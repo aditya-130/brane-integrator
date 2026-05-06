@@ -117,7 +117,7 @@ class Validator:
 
         # workflow-level mappings
         for field, value in config.project.model_dump().items():
-            if field in WF_SKIP_FIELDS or value is None:
+            if field in WF_SKIP_FIELDS or not value:
                 continue
             if field in WORKFLOW_REGISTRY:
                 construct = WORKFLOW_REGISTRY[field](value)
@@ -131,6 +131,36 @@ class Validator:
                     "flagged": False,
                     "note": None,
                 })
+            else:
+                mappings.append({
+                    "participant_node": None,
+                    "participant_user_id": None,
+                    "policy_field": field,
+                    "policy_value": str(value),
+                    "generated_construct": None,
+                    "line": None,
+                    "flagged": True,
+                    "reason": "Not enforceable at BraneScript level. Requires human review.",
+                    "note": None,
+                })
+
+        # jurisdiction mappings — aggregated from participant onboarding answers
+        seen_jurisdictions: set[str] = set()
+        for participant in config.participants:
+            for j in (participant.jurisdictions or []):
+                if j not in seen_jurisdictions:
+                    seen_jurisdictions.add(j)
+                    construct = f'#![wf_tag("jurisdiction.{j}")]'
+                    mappings.append({
+                        "participant_node": None,
+                        "participant_user_id": None,
+                        "policy_field": "jurisdictions",
+                        "policy_value": j,
+                        "generated_construct": construct,
+                        "line": find_line(construct),
+                        "flagged": False,
+                        "note": "Aggregated from participant onboarding answers and deduplicated",
+                    })
 
         # participant-level mappings
         for participant in config.participants:
@@ -161,6 +191,34 @@ class Validator:
                         "flagged": True,
                         "reason": "Not enforceable at BraneScript level. Requires human review.",
                         "note": None,
+                    })
+
+        # extracted claims from free-text (RQ3)
+        for participant in config.participants:
+            for claim in participant.extracted_claims:
+                if claim.policy_field in PARTICIPANT_REGISTRY:
+                    construct = PARTICIPANT_REGISTRY[claim.policy_field](claim.policy_value)
+                    mappings.append({
+                        "participant_node": participant.brane_node,
+                        "participant_user_id": participant.user_id,
+                        "policy_field": claim.policy_field,
+                        "policy_value": claim.policy_value,
+                        "generated_construct": construct,
+                        "line": find_line(construct),
+                        "flagged": False,
+                        "note": f"Extracted from free-text field '{claim.source_field}' (confidence: {claim.confidence})",
+                    })
+                else:
+                    mappings.append({
+                        "participant_node": participant.brane_node,
+                        "participant_user_id": participant.user_id,
+                        "policy_field": claim.policy_field,
+                        "policy_value": claim.policy_value,
+                        "generated_construct": None,
+                        "line": None,
+                        "flagged": True,
+                        "reason": "Extracted from free text but not enforceable at BraneScript level.",
+                        "note": f"Source: '{claim.source_field}' (confidence: {claim.confidence})",
                     })
 
         return {
