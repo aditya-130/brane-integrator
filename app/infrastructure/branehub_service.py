@@ -1,7 +1,11 @@
 import json
+import logging
+import uuid
 import httpx
 from pathlib import Path
 from app.infrastructure.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class BraneHubService:
@@ -28,7 +32,6 @@ class BraneHubService:
         participants_used: list[int],
         note: str | None = None,
     ) -> int:
-        import uuid
         integrator_metadata: dict = {"participants_used": participants_used}
         if note is not None:
             integrator_metadata["note"] = note
@@ -96,7 +99,7 @@ class BraneHubService:
             timeout=10,
         )
         if not response.is_success:
-            print(f"[send_completed] BraneHub returned {response.status_code}: {response.text}")
+            logger.warning("BraneHub returned %s on send_completed: %s", response.status_code, response.text)
 
     def mock_send_completed(
         self,

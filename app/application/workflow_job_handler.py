@@ -49,7 +49,7 @@ class WorkflowJobHandler:
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)
 
-        # 3.5 extract policy claims from free-text fields (RQ3)
+        # 3.5 extract policy claims from free-text fields
         integrator_config = self.free_text_extractor.extract(integrator_config, self.llm_service)
 
         # 4. interpret policies

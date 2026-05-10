@@ -1,5 +1,7 @@
+import logging
 import secrets
 import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.infrastructure.database import init_db, engine
@@ -8,17 +10,12 @@ from app.api import infra, workflow
 from app.domain.workflow import Workflow
 from sqlmodel import Session, select
 
-app = FastAPI(title="Brane Integrator")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-@app.middleware("http")
-async def verify_api_key(request: Request, call_next):
-    provided = request.headers.get("X-API-Key", "")
-    if not secrets.compare_digest(settings.BRANE_INTEGRATOR_API_KEY, provided):
-        return JSONResponse(
-            status_code=401,
-            content={"error": "unauthorized", "message": "Missing or invalid X-API-Key"},
-        )
-    return await call_next(request)
 
 def _cycle_terminal_state(project_id: int) -> str | None:
     try:
@@ -30,12 +27,12 @@ def _cycle_terminal_state(project_id: int) -> str | None:
         if response.status_code == 200:
             return response.json().get("cycle_terminal_state")
     except Exception as e:
-        print(f"[startup] could not reach BraneHub for project {project_id}: {e}")
+        logger.warning("Could not reach BraneHub for project %s: %s", project_id, e)
     return None
 
-@app.on_event("startup")
-def on_startup():
-    print("Starting Brane Integrator...")
+
+def _on_startup():
+    logger.info("Starting Brane Integrator...")
     init_db()
     with Session(engine) as db:
         stuck = db.exec(
@@ -44,15 +41,34 @@ def on_startup():
         for w in stuck:
             terminal = _cycle_terminal_state(w.project_id)
             if terminal is not None:
-                print(f"[startup] cycle already ended on BraneHub ({terminal}) — marking workflow {w.workflow_id} failed")
+                logger.warning("Cycle already ended on BraneHub (%s) — marking workflow %s failed", terminal, w.workflow_id)
                 w.status = "failed"
             else:
-                print(f"[startup] cycle still active — resetting workflow {w.workflow_id} ({w.status} → pending)")
+                logger.info("Cycle still active — resetting workflow %s (%s → pending)", w.workflow_id, w.status)
                 w.status = "pending"
             db.add(w)
         db.commit()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _on_startup()
+    yield
+
+
+app = FastAPI(title="Brane Integrator", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def verify_api_key(request: Request, call_next):
+    provided = request.headers.get("X-API-Key", "")
+    if not secrets.compare_digest(settings.BRANE_INTEGRATOR_API_KEY, provided):
+        return JSONResponse(
+            status_code=401,
+            content={"error": "unauthorized", "message": "Missing or invalid X-API-Key"},
+        )
+    return await call_next(request)
+
+
 app.include_router(infra.router)
 app.include_router(workflow.router)
-
-    

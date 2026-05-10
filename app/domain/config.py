@@ -62,25 +62,3 @@ class IntegratorConfig(BaseModel):
     participants: List[ParticipantPolicy]
 
 
-class InterpretedParticipant(BaseModel):
-    brane_node: str
-    dataset_name: str
-    on_annotation: str
-    tag_annotations: List[str] = []
-    flagged: List[str] = []
-
-
-class InterpretedWorkflow(BaseModel):
-    wf_tags: List[str] = []
-    participants: List[InterpretedParticipant]
-
-
-class RuleResult(BaseModel):
-    rule: str
-    passed: bool
-    message: Optional[str] = None
-
-
-class ValidationResult(BaseModel):
-    passed: bool
-    rules: list[RuleResult]

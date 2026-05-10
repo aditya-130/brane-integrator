@@ -1,6 +1,9 @@
+import logging
 from abc import ABC, abstractmethod
 from openai import OpenAI
 from app.infrastructure.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class LlmService(ABC):
@@ -25,5 +28,5 @@ class OpenAILlmService(LlmService):
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"[LLM] OpenAI error: {e}")
+            logger.error("OpenAI error: %s", e)
             return None

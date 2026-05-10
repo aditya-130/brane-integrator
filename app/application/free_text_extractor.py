@@ -1,7 +1,10 @@
 import json
+import logging
 from app.domain.config import ExtractedClaim, IntegratorConfig, ParticipantPolicy
 from app.infrastructure.llm_service import LlmService
 from app.application.prompt_builder import PromptBuilder
+
+logger = logging.getLogger(__name__)
 
 FREE_TEXT_FIELDS = ["privacy_legal_notes", "data_provenance", "source_of_truth"]
 
@@ -29,10 +32,10 @@ class FreeTextExtractor:
 
     def _call_llm(self, inputs: dict[str, str], llm_service: LlmService) -> list[ExtractedClaim]:
         system, user = self._prompt_builder.build_extraction_prompt(inputs)
-        print(f"[FreeTextExtractor] sending to LLM — fields: {list(inputs.keys())}")
+        logger.info("Sending to LLM — fields: %s", list(inputs.keys()))
         try:
             raw = llm_service.complete(system, user)
-            print(f"[FreeTextExtractor] LLM result received: {raw!r}")
+            logger.debug("LLM result received: %r", raw)
             if not raw:
                 return []
             raw = raw.strip()
@@ -40,8 +43,8 @@ class FreeTextExtractor:
                 raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
             data = json.loads(raw)
             claims = [ExtractedClaim(**item) for item in data if isinstance(item, dict)]
-            print(f"[FreeTextExtractor] extracted {len(claims)} claim(s): {claims}")
+            logger.info("Extracted %d claim(s)", len(claims))
             return claims
         except Exception as e:
-            print(f"[FreeTextExtractor] failed: {e}")
+            logger.warning("Free-text extraction failed: %s", e)
             return []

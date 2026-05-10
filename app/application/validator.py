@@ -1,17 +1,27 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
-from app.domain.config import IntegratorConfig, InterpretedWorkflow, RuleResult, ValidationResult
+from app.domain.config import IntegratorConfig
 from app.application.policy_interpreter import (
+    InterpretedWorkflow,
     PARTICIPANT_REGISTRY,
     PARTICIPANT_SKIP_FIELDS,
     WORKFLOW_REGISTRY,
     WF_SKIP_FIELDS,
 )
 
+
+class RuleResult(BaseModel):
+    rule: str
+    passed: bool
+    message: Optional[str] = None
+
+
+class ValidationResult(BaseModel):
+    passed: bool
+    rules: List[RuleResult]
+
 TAG_STRIPPED_NOTE = "stripped before Brane submission (eFLINT bug workaround)"
-
-
 
 
 

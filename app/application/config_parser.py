@@ -1,10 +1,36 @@
-from app.domain.infra import ParticipantNodeMap, ProjectConfig
 from sqlmodel import Session, select
+from app.domain.infra import ParticipantNodeMap, ProjectConfig
 from app.domain.config import (
     IntegratorConfig,
     ParticipantPolicy,
     ProjectBlock,
     WorkflowSpec,
+)
+from app.infrastructure.branehub_schema import (
+    FDP_STUDY_OBJECTIVE,
+    FDP_DATA_SENSITIVITY,
+    FDP_LEGAL_BASIS,
+    FDP_THIRD_PARTY_COLLABORATION,
+    FDP_SECURITY_MEASURES,
+    FDP_RESULT_SHARING_POLICY,
+    FDP_PARTICIPANT_RESPONSIBILITIES,
+    ONB_JURISDICTIONS,
+    ONB_INVOLVES_HUMAN_RESEARCH,
+    ONB_RETROSPECTIVE_CONSENT,
+    ONB_IRB_APPROVAL,
+    ONB_IDENTIFIABILITY,
+    ONB_DIRECT_IDENTIFIERS,
+    ONB_QUASI_IDENTIFIERS,
+    ONB_AUDIT_LOGGING,
+    ONB_NETWORK_CONNECTIVITY,
+    ONB_SECURITY_CERTIFICATIONS,
+    ONB_DATA_SHARING_AGREEMENTS,
+    ONB_MODEL_UPDATES_ALLOWED,
+    ONB_PER_ROUND_APPROVAL,
+    ONB_REQUIRES_UNLEARNING,
+    DFM_PRIVACY_LEGAL_NOTES,
+    DFM_DATA_PROVENANCE,
+    DFM_SOURCE_OF_TRUTH,
 )
 
 
@@ -23,13 +49,13 @@ class ConfigParser:
         fdp = raw["project"]["fdp_config"]
         return ProjectBlock(
             project_id=raw["project_id"],
-            study_objective=fdp.get("study_objective"),
-            data_sensitivity=fdp.get("data_sensitivity_level"),
-            legal_basis=fdp.get("legal_basis_for_processing"),
-            third_party_collaboration=fdp.get("third_party_collaboration"),
-            security_measures_planned=fdp.get("security_measures_planned"),
-            result_sharing_policy=fdp.get("result_sharing_policy"),
-            participant_responsibilities=fdp.get("participant_responsibilities"),
+            study_objective=fdp.get(FDP_STUDY_OBJECTIVE),
+            data_sensitivity=fdp.get(FDP_DATA_SENSITIVITY),
+            legal_basis=fdp.get(FDP_LEGAL_BASIS),
+            third_party_collaboration=fdp.get(FDP_THIRD_PARTY_COLLABORATION),
+            security_measures_planned=fdp.get(FDP_SECURITY_MEASURES),
+            result_sharing_policy=fdp.get(FDP_RESULT_SHARING_POLICY),
+            participant_responsibilities=fdp.get(FDP_PARTICIPANT_RESPONSIBILITIES),
         )
 
     def _build_workflow_spec(self, raw: dict) -> WorkflowSpec:
@@ -72,25 +98,25 @@ class ConfigParser:
                     brane_node=node_mapping.brane_node,
                     dataset_name=participant["brane_metadata"]["dataset_name"],
                     # construct-generating
-                    identifiability=onboarding.get("identifiability.processingLevel"),
-                    jurisdictions=onboarding.get("organization.jurisdictions"),
+                    identifiability=onboarding.get(ONB_IDENTIFIABILITY),
+                    jurisdictions=onboarding.get(ONB_JURISDICTIONS),
                     # flag-only structured fields
-                    involves_human_research=onboarding.get("dataNature.involvesHumanResearch"),
-                    retrospective_consent=onboarding.get("dataNature.retrospectiveConsent"),
-                    irb_approval=onboarding.get("ethicalLegal.irbApproval"),
-                    direct_identifiers=onboarding.get("identifiability.directIdentifiers"),
-                    quasi_identifiers=onboarding.get("identifiability.quasiIdentifiers"),
-                    audit_logging_required=onboarding.get("securityInfrastructure.auditLoggingRequired"),
-                    network_connectivity_policy=onboarding.get("securityInfrastructure.networkConnectionPolicy"),
-                    security_certifications=onboarding.get("securityInfrastructure.securityCertifications"),
-                    data_sharing_agreements=onboarding.get("dataGovernance.agreementsExist"),
-                    model_updates_allowed=onboarding.get("dataGovernance.modelUpdatesAllowed"),
-                    per_round_approval=onboarding.get("dataGovernance.requiresPerRoundApproval"),
-                    requires_unlearning=onboarding.get("retentionRevocation.requiresUnlearning"),
+                    involves_human_research=onboarding.get(ONB_INVOLVES_HUMAN_RESEARCH),
+                    retrospective_consent=onboarding.get(ONB_RETROSPECTIVE_CONSENT),
+                    irb_approval=onboarding.get(ONB_IRB_APPROVAL),
+                    direct_identifiers=onboarding.get(ONB_DIRECT_IDENTIFIERS),
+                    quasi_identifiers=onboarding.get(ONB_QUASI_IDENTIFIERS),
+                    audit_logging_required=onboarding.get(ONB_AUDIT_LOGGING),
+                    network_connectivity_policy=onboarding.get(ONB_NETWORK_CONNECTIVITY),
+                    security_certifications=onboarding.get(ONB_SECURITY_CERTIFICATIONS),
+                    data_sharing_agreements=onboarding.get(ONB_DATA_SHARING_AGREEMENTS),
+                    model_updates_allowed=onboarding.get(ONB_MODEL_UPDATES_ALLOWED),
+                    per_round_approval=onboarding.get(ONB_PER_ROUND_APPROVAL),
+                    requires_unlearning=onboarding.get(ONB_REQUIRES_UNLEARNING),
                     # free-text fields for FreeTextExtractor
-                    privacy_legal_notes=data_format.get("meta.privacy_legal"),
-                    data_provenance=data_format.get("meta.provenance"),
-                    source_of_truth=data_format.get("storage.source_of_truth"),
+                    privacy_legal_notes=data_format.get(DFM_PRIVACY_LEGAL_NOTES),
+                    data_provenance=data_format.get(DFM_DATA_PROVENANCE),
+                    source_of_truth=data_format.get(DFM_SOURCE_OF_TRUTH),
                 )
             )
 
