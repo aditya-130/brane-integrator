@@ -1,4 +1,5 @@
-from app.domain.config import IntegratorConfig, InterpretedWorkflow
+from app.domain.config import IntegratorConfig
+from app.application.policy_interpreter import InterpretedWorkflow
 
 
 class WorkflowGenerator:

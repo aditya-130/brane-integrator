@@ -1,4 +1,6 @@
-from app.domain.config import IntegratorConfig, InterpretedParticipant, InterpretedWorkflow
+from typing import List, Optional
+from pydantic import BaseModel
+from app.domain.config import IntegratorConfig
 
 PARTICIPANT_REGISTRY = {
     "brane_node": lambda v: f'#[on("{v}")]',
@@ -23,6 +25,19 @@ PARTICIPANT_SKIP_FIELDS = {
 
 # Skipped entirely — informational only, no construct and no flag
 WF_SKIP_FIELDS = {"project_id", "study_objective"}
+
+
+class InterpretedParticipant(BaseModel):
+    brane_node: str
+    dataset_name: str
+    on_annotation: str
+    tag_annotations: List[str] = []
+    flagged: List[str] = []
+
+
+class InterpretedWorkflow(BaseModel):
+    wf_tags: List[str] = []
+    participants: List[InterpretedParticipant]
 
 
 class PolicyInterpreter:
