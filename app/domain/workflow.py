@@ -12,6 +12,10 @@ class Workflow(SQLModel, table=True):
     script_version: Optional[int] = None
     branescript: Optional[str] = None
     traceability_report: Optional[str] = None
+    validation_result: Optional[str] = None
+    generation_strategy: Optional[str] = None
+    llm_calls_made: int = 0
+    regeneration_count: int = 0
     status: str = "pending" # pending | generating | generated | approved | executing | completed | failed | invalidated
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_at: Optional[datetime] = None

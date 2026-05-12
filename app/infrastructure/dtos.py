@@ -6,7 +6,7 @@ class ParticipantNodeMappingRequest(BaseModel):
     brane_node: str
 
 class ProjectConfigRequest (BaseModel):
-    project_id: int 
+    project_id: int
     coordinator_node: str
     package: str
     local_function: str

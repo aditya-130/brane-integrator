@@ -36,7 +36,7 @@ def create_project_config(request: ProjectConfigRequest, db_session: Session = D
         coordinator_node=request.coordinator_node,
         package=request.package,
         local_function=request.local_function,
-        combine_function=request.combine_function
+        combine_function=request.combine_function,
     )
     db_session.add(project_config)
     db_session.commit()
@@ -48,5 +48,5 @@ def create_project_config(request: ProjectConfigRequest, db_session: Session = D
         "coordinator_node": project_config.coordinator_node,
         "package": project_config.package,
         "local_function": project_config.local_function,
-        "combine_function": project_config.combine_function
+        "combine_function": project_config.combine_function,
     }

@@ -110,3 +110,92 @@ Rules:
 
 FREE_TEXT_EXTRACTION_USER = """Free-text inputs for this participant:
 {free_text_inputs}"""
+
+
+LLM_GENERATOR_SYSTEM = """You are a BraneScript workflow generator for federated learning projects.
+
+""" + BRANESCRIPT_CONSTRUCTS + """
+
+--- EXACT FORMAT RULES ---
+You MUST follow this exact structure. Any deviation will cause a runtime error.
+
+RULE 1: Every statement or annotation is on its own line. Never put two annotations or a statement and annotation on the same line.
+
+RULE 2: #![wf_tag()] lines have NO semicolon. Write exactly:
+#![wf_tag("sensitivity.High")]
+NOT:
+#![wf_tag("sensitivity.High")];   <- WRONG, no semicolon allowed
+
+RULE 3: #[on()] and #[tag()] are each on their own separate line. Write:
+#[on("worker1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := compute_local_stats(data_1);
+NOT:
+#[on("worker1")] #[tag("identifiability.Pseudonymized")] let stats_1 := ...   <- WRONG
+
+RULE 4: The exact order for each participant block is:
+#[on("node-name")]
+#[tag("identifiability.VALUE")]
+let result_N := local_function(data_N);
+
+RULE 5: The exact order for the combine block is:
+#[on("coordinator-node")]
+let result := combine_function(result_1, result_2, ...);
+
+--- COMPLETE EXAMPLE ---
+Here is a correct example for a 2-participant project:
+
+import mypackage;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("jurisdiction.EU")]
+
+let data_1 := new Data { name := "dataset-site1" };
+let data_2 := new Data { name := "dataset-site2" };
+
+#[on("site1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := local_fn(data_1);
+
+#[on("site2")]
+#[tag("identifiability.Anonymized")]
+let stats_2 := local_fn(data_2);
+
+#[on("central")]
+let result := combine_fn(stats_1, stats_2);
+
+return result;
+
+--- GENERATION RULES ---
+1. Start with: import <package>;
+2. Place all #![wf_tag()] lines immediately after import, one per line, NO semicolons.
+3. Declare all datasets: let data_N := new Data { name := "dataset-name" };
+4. For each participant: one #[on()] line, then one #[tag()] per tag, each on its own line, then the let statement.
+5. For the combine step: #[on("coordinator")] on its own line, then the combine let statement.
+6. End with: return <result>;
+7. Return ONLY the BraneScript. No markdown, no comments, no explanation."""
+
+
+LLM_GENERATOR_USER = """Generate a complete BraneScript workflow for the following federated project.
+
+Package: {package}
+Local function (runs at each participant): {local_function}
+Combine function (runs at coordinator): {combine_function}
+Coordinator node: {coordinator_node}
+
+Participants:
+{participants_block}
+
+Workflow-level policy tags to include (one per line, NO semicolons):
+{wf_tags_block}
+
+Generate the BraneScript now:"""
+
+
+LLM_GENERATOR_RETRY_SUFFIX = """
+
+--- PREVIOUS ATTEMPT FAILED VALIDATION ---
+The following rules failed. Fix them in your new response:
+{failures}
+
+Generate a corrected BraneScript now:"""

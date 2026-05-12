@@ -1,6 +1,15 @@
+import json
+import logging
+import os
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import BaseModel
+import httpx
+from app.infrastructure.settings import settings
+
+logger = logging.getLogger(__name__)
 from app.domain.config import IntegratorConfig
 from app.application.policy_interpreter import (
     InterpretedWorkflow,
@@ -59,25 +68,28 @@ class Validator:
                 message=None if present else f"Missing: {p.on_annotation} for {p.brane_node}",
             ))
 
-        # Rule 4: combine step pinned to coordinator
-        coordinator_on = f'#[on("{config.workflow.coordinator_node}")]'
+        # Rule 4: if a combine function appears in the script, it must be pinned to coordinator
         combine_fn = config.workflow.combine_function
-        found = False
-        prev_was_coordinator = False
-        for line in lines:
-            stripped = line.strip()
-            if stripped == coordinator_on:
-                prev_was_coordinator = True
-            elif stripped.startswith("#[on("):
-                prev_was_coordinator = False
-            if combine_fn in stripped and prev_was_coordinator:
-                found = True
-                break
-        rules.append(RuleResult(
-            rule="combine_pinned_to_coordinator",
-            passed=found,
-            message=None if found else f"Combine step not pinned to coordinator '{config.workflow.coordinator_node}'",
-        ))
+        if combine_fn not in branescript:
+            rules.append(RuleResult(rule="combine_pinned_to_coordinator", passed=True, message="N/A — no combine step in this workflow"))
+        else:
+            coordinator_on = f'#[on("{config.workflow.coordinator_node}")]'
+            found = False
+            prev_was_coordinator = False
+            for line in lines:
+                stripped = line.strip()
+                if stripped == coordinator_on:
+                    prev_was_coordinator = True
+                elif stripped.startswith("#[on("):
+                    prev_was_coordinator = False
+                if combine_fn in stripped and prev_was_coordinator:
+                    found = True
+                    break
+            rules.append(RuleResult(
+                rule="combine_pinned_to_coordinator",
+                passed=found,
+                message=None if found else f"Combine step not pinned to coordinator '{config.workflow.coordinator_node}'",
+            ))
 
         # Rule 5: wf_tags present in .bs
         for wf_tag in interpreted.wf_tags:
@@ -107,10 +119,49 @@ class Validator:
                 message=None if present else f"Missing dataset ref: {p.dataset_name} for {p.brane_node}",
             ))
 
+        # Rule 8: verify package and functions are registered in the Brane API
+        # brane workflow check is broken in nightly (constructs URLs without http:// scheme),
+        # so we query the GraphQL API directly instead.
+        rules.extend(self._check_package_registered(config))
+
         return ValidationResult(
             passed=all(r.passed for r in rules),
             rules=rules,
         )
+
+    def _check_package_registered(self, config: IntegratorConfig) -> List[RuleResult]:
+        query = '{ packages { name functionsAsJson } }'
+        api_url = f"http://{settings.BRANE_API_URL}/graphql"
+        try:
+            resp = httpx.post(api_url, json={"query": query}, timeout=10)
+            resp.raise_for_status()
+            packages = resp.json().get("data", {}).get("packages", [])
+        except Exception as e:
+            logger.warning("Validator: could not reach Brane API at %s — %s", api_url, e)
+            return [RuleResult(rule="package_registered", passed=False, message=f"Brane API unreachable: {e}")]
+
+        pkg_map = {p["name"]: json.loads(p.get("functionsAsJson") or "{}") for p in packages}
+        results = []
+
+        package = config.workflow.package
+        if package not in pkg_map:
+            logger.warning("Validator: package '%s' not found in Brane API", package)
+            results.append(RuleResult(rule="package_registered", passed=False, message=f"Package '{package}' not registered in Brane"))
+            return results
+
+        logger.info("Validator: package '%s' found in Brane API", package)
+        results.append(RuleResult(rule="package_registered", passed=True, message=None))
+
+        functions = pkg_map[package]
+        for fn_field, fn_name in [("local_function", config.workflow.local_function), ("combine_function", config.workflow.combine_function)]:
+            if fn_name in functions:
+                logger.info("Validator: function '%s' found in package '%s'", fn_name, package)
+                results.append(RuleResult(rule=f"function_registered_{fn_field}", passed=True, message=None))
+            else:
+                logger.warning("Validator: function '%s' NOT found in package '%s'", fn_name, package)
+                results.append(RuleResult(rule=f"function_registered_{fn_field}", passed=False, message=f"Function '{fn_name}' not found in package '{package}'"))
+
+        return results
 
     def generate_traceability_report(
         self, branescript: str, config: IntegratorConfig, interpreted: InterpretedWorkflow

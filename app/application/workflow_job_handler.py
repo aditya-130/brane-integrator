@@ -1,15 +1,20 @@
 import json
+import logging
 import subprocess
 import tempfile
 import re
 import os
 import time
 from datetime import datetime, timezone
+from app.infrastructure.settings import settings
+
+logger = logging.getLogger(__name__)
 from app.application.config_parser import ConfigParser
 from app.application.free_text_extractor import FreeTextExtractor
 from app.application.policy_interpreter import PolicyInterpreter
 from app.application.prompt_builder import PromptBuilder
-from app.application.workflow_generator import WorkflowGenerator
+from app.application.workflow_generation.template_generator import TemplateGenerator
+from app.application.workflow_generation.llm_generator import LlmGenerator
 from app.application.validator import Validator
 from sqlmodel import Session
 from app.domain.workflow import Workflow
@@ -32,10 +37,10 @@ class WorkflowJobHandler:
         self.free_text_extractor = FreeTextExtractor()
         self.policy_interpreter = PolicyInterpreter()
         self.prompt_builder = PromptBuilder()
-        self.workflow_generator = WorkflowGenerator()
         self.validator = Validator()
 
     def handle_generation(self, workflow_id: str, project_id: int, cycle_id: int):
+        logger.info("[%s] Starting generation for project_id=%d cycle_id=%d", workflow_id, project_id, cycle_id)
 
         # 1. update workflow status
         workflow = self.db.get(Workflow, workflow_id)
@@ -48,32 +53,64 @@ class WorkflowJobHandler:
 
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)
+        logger.info("[%s] Config parsed — package=%s, participants=%d", workflow_id, integrator_config.workflow.package, len(integrator_config.participants))
 
         # 3.5 extract policy claims from free-text fields
+        llm_calls = 0
         integrator_config = self.free_text_extractor.extract(integrator_config, self.llm_service)
+        if self.llm_service:
+            llm_calls += 1
+            logger.info("[%s] Free-text extraction done (llm_calls so far: %d)", workflow_id, llm_calls)
 
         # 4. interpret policies
         interpreted = self.policy_interpreter.interpret(integrator_config)
+        logger.info("[%s] Policies interpreted — wf_tags=%s", workflow_id, interpreted.wf_tags)
 
-        # 5. generate branescript
-        branescript = self.workflow_generator.generate(integrator_config, interpreted)
+        # 5. generate branescript — dispatch to template or LLM generator
+        pattern = settings.WORKFLOW_GENERATION_STRATEGY
+        logger.info("[%s] Generation strategy: %s", workflow_id, pattern)
+        if pattern == "llm":
+            if not self.llm_service:
+                raise RuntimeError("LlmGenerator requires llm_service but none was provided")
+            generator = LlmGenerator(self.llm_service)
+            branescript = generator.generate(integrator_config, interpreted)
+            llm_calls += generator.llm_calls_made
+            logger.info("[%s] LlmGenerator done — llm_calls_made=%d total_llm_calls=%d", workflow_id, generator.llm_calls_made, llm_calls)
+        else:
+            branescript = TemplateGenerator().generate(integrator_config, interpreted)
+            logger.info("[%s] TemplateGenerator done", workflow_id)
 
         # 6. validate + generate traceability report
         validation_result = self.validator.validate(branescript, integrator_config, interpreted)
+        passed = sum(1 for r in validation_result.rules if r.passed)
+        failed = sum(1 for r in validation_result.rules if not r.passed)
+        logger.info("[%s] Validation complete — passed=%d failed=%d overall=%s", workflow_id, passed, failed, "PASS" if validation_result.passed else "FAIL")
+        if not validation_result.passed:
+            for r in validation_result.rules:
+                if not r.passed:
+                    logger.warning("[%s] Rule FAILED: %s — %s", workflow_id, r.rule, r.message)
+
         traceability_report = self.validator.generate_traceability_report(
             branescript, integrator_config, interpreted
         )
 
         if not validation_result.passed:
             workflow.status = "failed"
+            workflow.generation_strategy = pattern
+            workflow.validation_result = validation_result.model_dump_json()
             self.db.add(workflow)
             self.db.commit()
             failed_rules = [r.rule for r in validation_result.rules if not r.passed]
             raise RuntimeError(f"Validation failed: {failed_rules}")
 
         # 7. save to workflow row
+        regeneration_count = (workflow.regeneration_count or 0) + (1 if workflow.branescript else 0)
         workflow.branescript = branescript
         workflow.traceability_report = json.dumps(traceability_report)
+        workflow.validation_result = validation_result.model_dump_json()
+        workflow.generation_strategy = pattern
+        workflow.llm_calls_made = llm_calls
+        workflow.regeneration_count = regeneration_count
         workflow.status = "generated"
         self.db.add(workflow)
         self.db.commit()
@@ -94,6 +131,7 @@ class WorkflowJobHandler:
         workflow.script_version = script_version
         self.db.add(workflow)
         self.db.commit()
+        logger.info("[%s] Generation complete — strategy=%s llm_calls=%d regenerations=%d script_version=%s", workflow_id, pattern, llm_calls, workflow.regeneration_count, script_version)
 
     def handle_execution(self, workflow_id: str) -> str:
 

@@ -1,3 +1,4 @@
+import json
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
@@ -194,3 +195,48 @@ def dismissed_workflow(
 
     background_tasks.add_task(job)
     return
+
+
+@router.get("/{project_id}/workflows/{workflow_id}/metrics", status_code=200)
+def get_workflow_metrics(
+    project_id: int,
+    workflow_id: str,
+    db_session: Session = Depends(get_db),
+):
+    workflow = db_session.exec(
+        select(Workflow).where(
+            Workflow.workflow_id == workflow_id,
+            Workflow.project_id == project_id,
+        )
+    ).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    validation_rules = None
+    if workflow.validation_result:
+        try:
+            parsed = json.loads(workflow.validation_result)
+            validation_rules = parsed.get("rules")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+    passed = sum(1 for r in validation_rules if r.get("passed")) if validation_rules else None
+    failed = sum(1 for r in validation_rules if not r.get("passed")) if validation_rules else None
+
+    return {
+        "workflow_id": workflow.workflow_id,
+        "project_id": workflow.project_id,
+        "cycle_id": workflow.cycle_id,
+        "status": workflow.status,
+        "generation_strategy": workflow.generation_strategy,
+        "llm_calls_made": workflow.llm_calls_made,
+        "regeneration_count": workflow.regeneration_count,
+        "generated_at": workflow.triggered_at,
+        "executed_at": workflow.executed_at,
+        "validation": {
+            "passed": passed,
+            "failed": failed,
+            "rules": validation_rules,
+        } if validation_rules is not None else None,
+    }
