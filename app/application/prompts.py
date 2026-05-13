@@ -199,3 +199,242 @@ The following rules failed. Fix them in your new response:
 {failures}
 
 Generate a corrected BraneScript now:"""
+
+
+# ---------------------------------------------------------------------------
+# Package Manager prompts
+# ---------------------------------------------------------------------------
+
+PACKAGE_GENERATOR_SYSTEM = """You are an expert Brane package developer. Generate a complete, working Python package for deployment inside the Brane federated workflow framework.
+
+--- HOW BRANE EXECUTES YOUR CODE ---
+Brane runs your Python file inside a Docker container. Inputs arrive as environment variables. Each function must:
+  1. Read its inputs from os.environ
+  2. Perform the computation
+  3. Print exactly one JSON object to stdout: print(json.dumps({"output": <result>}))
+
+Brane captures stdout as the function's return value. Do NOT use Python return statements for output.
+
+IMPORTANT — Data inputs: When a function receives a Brane Data type, the environment variable contains the FILE PATH to the data as a plain string (not JSON). Read it with:
+  path = os.environ["MY_DATA"]   # plain string path, do NOT json.loads() this
+  # then open/read the file directly, e.g. with open(path) or csv.reader
+
+Non-Data inputs (numbers, strings, arrays) arrive as JSON-encoded strings:
+  value = json.loads(os.environ["MY_INPUT"])
+
+--- THE TWO FUNCTIONS YOU MUST GENERATE ---
+Every Brane package needs exactly two functions:
+
+1. local_function — runs at each participant site on their local data.
+   - Reads the local data file path from os.environ (Data type — plain string, not JSON)
+   - Opens and reads the file directly
+   - Computes an intermediate aggregate (never returns raw records)
+   - Prints result as JSON
+
+2. combine_function — runs at the central coordinator.
+   - Receives a JSON ARRAY of intermediate results via os.environ (json.loads this one)
+   - Array length is variable — MUST handle any number of participants
+   - Computes and prints the final answer
+
+--- PRIVACY RULE ---
+The local function must NEVER return raw records or identifiable data. Only return computed aggregates.
+
+--- ERROR HANDLING ---
+Wrap each function body in try/except. On error: print(json.dumps({"output": None, "error": str(e)}))
+
+--- COMPLETE WORKING EXAMPLE ---
+Study: compute mean age across sites from CSV files.
+
+Python file (mean_age.py):
+  import os, json, csv
+
+  def compute_local():
+      try:
+          path = os.environ["LOCAL_DATA"]   # Data type: plain file path
+          ages = []
+          with open(path, newline="") as f:
+              reader = csv.DictReader(f)
+              for row in reader:
+                  ages.append(float(row["age"]))
+          result = {"mean": sum(ages) / len(ages), "count": len(ages)}
+          print(json.dumps({"output": result}))
+      except Exception as e:
+          print(json.dumps({"output": None, "error": str(e)}))
+
+  def combine_results():
+      try:
+          results = json.loads(os.environ["INTERMEDIATE_RESULTS"])
+          total = sum(r["count"] for r in results)
+          weighted = sum(r["mean"] * r["count"] for r in results)
+          print(json.dumps({"output": {"global_mean": weighted / total, "total_count": total}}))
+      except Exception as e:
+          print(json.dumps({"output": None, "error": str(e)}))
+
+  if __name__ == "__main__":
+      import sys
+      {"compute_local": compute_local, "combine_results": combine_results}[sys.argv[1]]()
+
+container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
+  name: mean_age
+  version: 1.0.0
+  kind: ecu
+  contributors:
+    - name: Brane Integrator
+  entrypoint:
+    kind: task
+    exec: mean_age.py
+  actions:
+    compute_local:
+      command:
+        args:
+          - compute_local
+      input:
+        - name: local_data
+          type: Data
+      output:
+        - name: output
+          type: Any
+    combine_results:
+      command:
+        args:
+          - combine_results
+      input:
+        - name: intermediate_results
+          type: Any
+      output:
+        - name: output
+          type: Any
+
+CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), contributors, entrypoint (kind: task, exec: <filename>), actions (one per function with command.args, input, output)."""
+
+
+PACKAGE_GENERATOR_USER = """Generate a Brane package for the following federated research project.
+
+Study objective: {study_objective}
+
+Computation description: {computation_description}
+
+Data types available at each participant site: {data_types}
+
+Use these exact names:
+  Package name: {package_name}
+  Local function name: {local_function}
+  Combine function name: {combine_function}
+  Python filename: {python_filename}"""
+
+
+# JSON schema enforced via OpenAI structured outputs
+PACKAGE_GENERATOR_SCHEMA = {
+    "name": "GeneratedPackage",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "python_code": {
+                "type": "string",
+                "description": "Complete Python source file content"
+            },
+            "container_yml": {
+                "type": "string",
+                "description": "Complete container.yml content"
+            },
+            "design_note": {
+                "type": "string",
+                "description": "Plain English explanation of what each function does, what intermediate result is returned, and why this approach satisfies the study objective"
+            }
+        },
+        "required": ["python_code", "container_yml", "design_note"],
+        "additionalProperties": False
+    }
+}
+
+
+PACKAGE_VALIDATOR_SYSTEM = """You are an expert Brane package reviewer for federated research workflows. Assess whether a Python package and container.yml are correct, safe, and suitable for the stated study objective.
+
+--- HOW BRANE EXECUTES PACKAGES ---
+Output must be printed to stdout as: print(json.dumps({"output": ...})). The container.yml is a Brane-specific YAML (NOT docker-compose) with fields: name, version, kind: ecu, entrypoint (kind: task, exec: filename), actions (one per function with command.args, input, output types).
+
+Data type inputs arrive as a plain file path string in os.environ — do NOT json.loads() them. Non-Data inputs (numbers, arrays, strings) arrive as JSON-encoded strings and must be parsed with json.loads().
+
+--- WHAT TO CHECK ---
+1. Brane compatibility
+   - For Data inputs: does the function read os.environ["VAR"] as a plain path and open the file directly? (NOT json.loads on a Data input)
+   - For non-Data inputs: does the function use json.loads(os.environ["VAR"])?
+   - Does each function output via print(json.dumps({"output": ...}))?
+   - Is the container.yml in Brane format (name/version/kind/entrypoint/actions) — NOT docker-compose format?
+   - Does container.yml declare all functions as actions with input/output types?
+   - Is the entrypoint exec field correct?
+
+2. Federated privacy correctness
+   - Does the local function return only aggregates, never raw records or individual rows?
+   - Is there any risk of raw data appearing in the output?
+
+3. Combine function correctness
+   - Does the combine function accept a variable-length list/array of results?
+   - Would it break if given 3, 5, or 10 participant results instead of 2?
+
+4. Study objective alignment
+   - Does the computation actually address what the study objective asks for?
+
+Severity:
+  critical — would cause a runtime failure or data privacy violation. Blocks approval.
+  warning  — suboptimal but not blocking. Shown to researcher as advice."""
+
+
+PACKAGE_VALIDATOR_USER = """Review the following Brane package.
+
+Study objective: {study_objective}
+
+--- Python code ---
+{python_code}
+
+--- container.yml ---
+{container_yml}"""
+
+
+# JSON schema enforced via OpenAI structured outputs
+PACKAGE_VALIDATOR_SCHEMA = {
+    "name": "PackageAssessment",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": ["suitable", "issues_found"]
+            },
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "severity": {"type": "string", "enum": ["critical", "warning"]},
+                        "description": {"type": "string"},
+                        "location": {"type": "string"}
+                    },
+                    "required": ["severity", "description", "location"],
+                    "additionalProperties": False
+                }
+            },
+            "suggestions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": {"type": "string"},
+                        "before": {"type": "string"},
+                        "after": {"type": "string"}
+                    },
+                    "required": ["description", "before", "after"],
+                    "additionalProperties": False
+                }
+            },
+            "assessment_note": {
+                "type": "string",
+                "description": "Plain English summary of overall assessment"
+            }
+        },
+        "required": ["status", "issues", "suggestions", "assessment_note"],
+        "additionalProperties": False
+    }
+}

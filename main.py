@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.infrastructure.database import init_db, engine
 from app.infrastructure.settings import settings
-from app.api import infra, workflow
+from app.api import infra, workflow, packages
 from app.domain.workflow import Workflow
 from sqlmodel import Session, select
 
@@ -72,3 +72,4 @@ async def verify_api_key(request: Request, call_next):
 
 app.include_router(infra.router)
 app.include_router(workflow.router)
+app.include_router(packages.router)

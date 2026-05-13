@@ -2,6 +2,9 @@ from sqlalchemy import text
 from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
 
+# Import all models so SQLModel.metadata knows about every table before create_all
+from app.domain import workflow, infra, package  # noqa: F401
+
 DATABASE_URL = "sqlite:///./integrator.db"
 
 engine = create_engine(DATABASE_URL, echo=True)
@@ -17,6 +20,7 @@ def _migrate():
         "ALTER TABLE workflow ADD COLUMN generation_strategy TEXT",
         "ALTER TABLE workflow ADD COLUMN llm_calls_made INTEGER DEFAULT 0",
         "ALTER TABLE workflow ADD COLUMN regeneration_count INTEGER DEFAULT 0",
+        "ALTER TABLE packagesource ADD COLUMN study_objective TEXT DEFAULT ''",
     ]
     with engine.connect() as conn:
         for sql in migrations:
