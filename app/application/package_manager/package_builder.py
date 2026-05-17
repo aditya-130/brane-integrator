@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.infrastructure.settings import settings
+
 logger = logging.getLogger(__name__)
 
 _PUSH_RETRIES = 3
@@ -21,8 +23,12 @@ class PackageBuilder:
 
     def build(self, working_dir: Path, container_yml_path: Path) -> BuildResult:
         try:
+            cmd = ["brane", "package", "build"]
+            if settings.BRANELET_PATH:
+                cmd += ["--init", settings.BRANELET_PATH]
+            cmd.append(str(container_yml_path))
             proc = subprocess.run(
-                ["brane", "package", "build", str(container_yml_path)],
+                cmd,
                 cwd=working_dir,
                 capture_output=True,
                 text=True,
@@ -31,6 +37,12 @@ class PackageBuilder:
             if proc.returncode != 0:
                 logger.error("brane build failed: %s", proc.stderr)
                 return BuildResult(success=False, stderr=proc.stderr)
+
+            # Brane CLI bug: returns exit code 0 even on Docker build failure.
+            # Detect failure by checking stdout for the error marker.
+            if "failed to build" in proc.stdout.lower():
+                logger.error("brane build failed (exit 0 bug): %s", proc.stdout)
+                return BuildResult(success=False, stderr=proc.stdout)
 
             # Extract image name from stdout (brane prints "Successfully built <name>:<version>")
             image_name = _parse_image_name(proc.stdout) or container_yml_path.parent.name

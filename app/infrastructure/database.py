@@ -21,6 +21,8 @@ def _migrate():
         "ALTER TABLE workflow ADD COLUMN llm_calls_made INTEGER DEFAULT 0",
         "ALTER TABLE workflow ADD COLUMN regeneration_count INTEGER DEFAULT 0",
         "ALTER TABLE packagesource ADD COLUMN study_objective TEXT DEFAULT ''",
+        "ALTER TABLE packagesource ADD COLUMN local_function TEXT",
+        "ALTER TABLE packagesource ADD COLUMN combine_function TEXT",
     ]
     with engine.connect() as conn:
         for sql in migrations:

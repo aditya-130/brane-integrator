@@ -1,0 +1,140 @@
+{
+   "schema_version":"1.0",
+   "project_id":50,
+   "project":{
+      "title":"MeanAge: Multi-Hospital Patient Age Analysis",
+      "description":"Compute the mean patient age across participating hospital cohorts without centralising patient records.",
+      "type":"FDP",
+      "status":"open",
+      "created_at":"2026-05-16T10:00:00Z",
+      "tags":["patient-records","age-statistics"],
+      "owner":{
+         "user_id":1,
+         "username":"researcher",
+         "email":"researcher@institution.example"
+      },
+      "fdp_config":{
+         "research_institution":"University of Amsterdam",
+         "contact_email":"researcher@institution.example",
+         "study_objective":"Compute the mean patient age across participating hospital cohorts without centralising patient records",
+         "data_types_required":["CSV","patient records"],
+         "data_sensitivity_level":"High",
+         "security_measures_planned":["encryption_at_rest"],
+         "result_sharing_policy":"Aggregated statistics only — no raw patient data",
+         "participant_responsibilities":"Keep local patient CSV on local nodes; do not export raw records.",
+         "legal_basis_for_processing":"GDPR Article 9(2)(j) — Scientific Research",
+         "third_party_collaboration":null
+      },
+      "expected_data_format":{
+         "expect.storage.files":["CSV"],
+         "expect.schema.json_schema":"Yes",
+         "expect.meta.field_descriptions":"Yes"
+      },
+      "questionnaires":{
+         "onboarding":{
+            "title":"FDP Onboarding Questionnaire",
+            "version":"1.0.0",
+            "sections":[
+               {
+                  "id":"organization",
+                  "title":"About your organisation",
+                  "questions":[
+                     {
+                        "id":"organization.name",
+                        "text":"Organisation name",
+                        "type":"text",
+                        "required":true
+                     },
+                     {
+                        "id":"organization.jurisdictions",
+                        "text":"In which jurisdictions do you operate?",
+                        "type":"multiselect",
+                        "options":["EU","US","UK","JP","Other"]
+                     }
+                  ]
+               },
+               {
+                  "id":"identifiability",
+                  "title":"Data identifiability",
+                  "questions":[
+                     {
+                        "id":"identifiability.processingLevel",
+                        "text":"What level of processing has been applied to identifying fields?",
+                        "type":"radio",
+                        "options":["Raw","Pseudonymized","Anonymized"]
+                     }
+                  ]
+               }
+            ]
+         },
+         "data_format":{
+            "title":"Data Format Questionnaire",
+            "version":"1.0.0",
+            "sections":[
+               {
+                  "id":"storage",
+                  "title":"Storage",
+                  "questions":[
+                     {
+                        "id":"storage.files",
+                        "text":"What file formats do you hold?",
+                        "type":"multiselect",
+                        "options":["CSV","JSON","Other"]
+                     }
+                  ]
+               },
+               {
+                  "id":"schema",
+                  "title":"Schema",
+                  "questions":[
+                     {
+                        "id":"schema.json_schema",
+                        "text":"Do you have a JSON Schema for your tabular/metadata layout?",
+                        "type":"radio",
+                        "options":["Yes","No","Partially"]
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   },
+   "accepted_participants":[
+      {
+         "user_id":10,
+         "username":"dr.cohort_a",
+         "is_active":true,
+         "joined_at":"2026-05-16T10:05:00Z",
+         "brane_metadata":{
+            "dataset_name":"cohort-a-records"
+         },
+         "onboarding_answers":{
+            "organization.name":"Hospital A",
+            "organization.jurisdictions":["EU"],
+            "identifiability.processingLevel":"Pseudonymized"
+         },
+         "data_format_answers":{
+            "storage.files":["CSV"],
+            "schema.json_schema":"Yes"
+         }
+      },
+      {
+         "user_id":11,
+         "username":"dr.cohort_b",
+         "is_active":true,
+         "joined_at":"2026-05-16T10:06:00Z",
+         "brane_metadata":{
+            "dataset_name":"cohort-b-records"
+         },
+         "onboarding_answers":{
+            "organization.name":"Hospital B",
+            "organization.jurisdictions":["EU"],
+            "identifiability.processingLevel":"Anonymized"
+         },
+         "data_format_answers":{
+            "storage.files":["CSV"],
+            "schema.json_schema":"Yes"
+         }
+      }
+   ]
+}

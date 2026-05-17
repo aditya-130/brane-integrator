@@ -48,8 +48,12 @@ class WorkflowJobHandler:
         self.db.add(workflow)
         self.db.commit()
 
-        # 2. fetch raw project config from BraneHub
-        raw = self.branehub_service.fetch_project_config(project_id)
+        # 2. fetch raw project config from BraneHub (falls back to mock when BRANEHUB_BASE_URL is unset)
+        if settings.BRANEHUB_BASE_URL:
+            raw = self.branehub_service.fetch_project_config(project_id)
+        else:
+            logger.info("[%s] BRANEHUB_BASE_URL not set — using mock project config", workflow_id)
+            raw = self.branehub_service.fetch_mock_project_config(project_id)
 
         # 3. parse into IntegratorConfig
         integrator_config = self.config_parser.parse(raw)

@@ -18,4 +18,6 @@ class PackageSource(SQLModel, table=True):
     assessment_status: str = "pending"      # "pending" | "approved"
     approved_at: Optional[datetime] = None
     working_dir: Optional[str] = None
+    local_function: Optional[str] = None
+    combine_function: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

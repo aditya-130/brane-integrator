@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     WORKFLOW_GENERATION_STRATEGY: str = "map_reduce"
+    BRANELET_PATH: str = ""  # path to local branelet binary; if set, passed as --init to brane package build
 
     model_config = {"env_file": ".env"}
 

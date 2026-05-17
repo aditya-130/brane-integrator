@@ -1,0 +1,40 @@
+hostnames: {}
+namespace: brane-worker-{{ brane_node }}
+node: !worker
+  name: {{ brane_node }}
+  usecases:
+    central:
+      api: host.docker.internal:50051
+  paths:
+    certs: {{ working_dir }}/certs
+    packages: {{ working_dir }}/packages
+    backend: {{ working_dir }}/backend.yml
+    policy_database: {{ working_dir }}/policies.db
+    policy_delib_secret: {{ working_dir }}/policy_delib_secret.json
+    policy_store_secret: {{ working_dir }}/policy_store_secret.json
+    policy_audit_log: null
+    proxy: {{ working_dir }}/proxy.yml
+    data: /home/aditya/brane/data
+    results: /home/aditya/brane/results
+    temp_data: /tmp/data
+    temp_results: /tmp/results
+  services:
+    reg:
+      name: brane-reg-{{ brane_node }}
+      address: brane-reg-{{ brane_node }}:{{ port_reg }}
+      bind: 0.0.0.0:{{ port_reg }}
+      external_address: host.docker.internal:{{ port_reg }}
+    job:
+      name: brane-job-{{ brane_node }}
+      address: brane-job-{{ brane_node }}:{{ port_job }}
+      bind: 0.0.0.0:{{ port_job }}
+      external_address: host.docker.internal:{{ port_job }}
+    chk:
+      name: brane-chk-{{ brane_node }}
+      host: brane-chk-{{ brane_node }}
+      delib: {{ port_chk_deliberation }}
+      store: {{ port_chk_store }}
+    prx: !private
+      name: brane-prx-{{ brane_node }}
+      address: brane-prx-{{ brane_node }}:{{ port_prx }}
+      bind: 0.0.0.0:{{ port_prx }}

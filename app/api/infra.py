@@ -1,10 +1,60 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from app.infrastructure.database import get_db
+
+from app.application.node_provisioner.node_provisioner import NodeProvisioner
 from app.domain.infra import ParticipantNodeMap, ProjectConfig
-from app.infrastructure.dtos import ParticipantNodeMappingRequest, ProjectConfigRequest
+from app.infrastructure.branehub_service import BraneHubService
+from app.infrastructure.database import get_db
+from app.infrastructure.dtos import (
+    DeprovisionRequest,
+    ParticipantNodeMappingRequest,
+    ProjectConfigRequest,
+    ProvisionCoordinatorRequest,
+    ProvisionRequest,
+    ProvisionResponse,
+)
 
 router = APIRouter(prefix="/infra", tags=["infra"])
+_provisioner = NodeProvisioner()
+_branehub = BraneHubService()
+
+
+@router.post("/provision", response_model=ProvisionResponse)
+async def provision_node(request: ProvisionRequest, db_session: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, lambda: _provisioner.provision(request.user_id, request.project_id, db_session, request.dataset_name)
+    )
+    if result.status == "ready":
+        loop.run_in_executor(
+            None,
+            lambda: _branehub.send_participant_ready(request.project_id, request.user_id, result.brane_node),
+        )
+    return ProvisionResponse(brane_node=result.brane_node, status=result.status, error=result.error)
+
+
+@router.post("/provision-coordinator", response_model=ProvisionResponse)
+async def provision_coordinator(request: ProvisionCoordinatorRequest, db_session: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, lambda: _provisioner.provision_coordinator(request.project_id, db_session)
+    )
+    return ProvisionResponse(brane_node=result.brane_node, status=result.status, error=result.error)
+
+
+@router.post("/deprovision")
+async def deprovision_node(request: DeprovisionRequest, db_session: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None, lambda: _provisioner.deprovision(request.user_id, request.project_id, db_session)
+    )
+    loop.run_in_executor(
+        None,
+        lambda: _branehub.send_participant_deprovisioned(request.project_id, request.user_id),
+    )
+    return {"status": "deprovisioned"}
 
 
 @router.post("/participant-nodes")

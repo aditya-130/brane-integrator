@@ -41,6 +41,11 @@ class RegisterPackageResponse(BaseModel):
     design_note: Optional[str] = None
 
 
+class RegisterPackageAcceptedResponse(BaseModel):
+    project_id: int
+    status: str   # "processing" | "assessed" | "approved" | "failed"
+
+
 class PackageStatusResponse(BaseModel):
     project_id: int
     source_type: str
@@ -50,7 +55,11 @@ class PackageStatusResponse(BaseModel):
     assessment_status: str
     python_code: str
     container_yml: str
-    llm_assessment: Optional[str] = None
+    design_note: Optional[str] = None
+    assessment_note: Optional[str] = None
+    issues: List[IssueDTO] = []
+    suggestions: List[SuggestionDTO] = []
+    has_critical_issues: bool = False
     working_dir: Optional[str] = None
     built_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
@@ -77,6 +86,31 @@ class RegeneratePackageResponse(BaseModel):
     python_code: str
     container_yml: str
     design_note: str
+
+
+# ---------------------------------------------------------------------------
+# Node Provisioner
+# ---------------------------------------------------------------------------
+
+class ProvisionRequest(BaseModel):
+    user_id: int
+    project_id: int
+    dataset_name: Optional[str] = None
+
+
+class ProvisionResponse(BaseModel):
+    brane_node: str
+    status: str          # "ready" | "failed"
+    error: Optional[str] = None
+
+
+class DeprovisionRequest(BaseModel):
+    user_id: int
+    project_id: int
+
+
+class ProvisionCoordinatorRequest(BaseModel):
+    project_id: int
 
 
 # ---------------------------------------------------------------------------
