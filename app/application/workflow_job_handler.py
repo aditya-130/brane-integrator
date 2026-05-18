@@ -76,8 +76,11 @@ class WorkflowJobHandler:
         if pattern == "llm":
             if not self.llm_service:
                 raise RuntimeError("LlmGenerator requires llm_service but none was provided")
+            from app.domain.package import PackageSource
+            pkg = self.db.get(PackageSource, project_id)
+            container_yml = pkg.container_yml if pkg else None
             generator = LlmGenerator(self.llm_service)
-            branescript = generator.generate(integrator_config, interpreted)
+            branescript = generator.generate(integrator_config, interpreted, container_yml=container_yml)
             llm_calls += generator.llm_calls_made
             logger.info("[%s] LlmGenerator done — llm_calls_made=%d total_llm_calls=%d", workflow_id, generator.llm_calls_made, llm_calls)
         else:
@@ -133,6 +136,7 @@ class WorkflowJobHandler:
             note=note,
         )
         workflow.script_version = script_version
+        workflow.note = note
         self.db.add(workflow)
         self.db.commit()
         logger.info("[%s] Generation complete — strategy=%s llm_calls=%d regenerations=%d script_version=%s", workflow_id, pattern, llm_calls, workflow.regeneration_count, script_version)
@@ -207,6 +211,7 @@ class WorkflowJobHandler:
 
             if result:
                 workflow.status = "completed"
+                workflow.execution_result = json.dumps(result)
                 self.db.add(workflow)
                 self.db.commit()
                 self.branehub_service.send_completed(
@@ -234,6 +239,7 @@ class WorkflowJobHandler:
         else:
             error = stderr or stdout or "brane exited with no output"
             workflow.status = "failed"
+            workflow.execution_result = error
             self.db.add(workflow)
             self.db.commit()
             self.branehub_service.send_completed(

@@ -176,9 +176,24 @@ def register_package(
     if request.source_type == "generate":
         if not request.computation_description:
             raise HTTPException(status_code=400, detail="computation_description required for source_type='generate'")
-        # Idempotent: row already exists means task is running or complete — use /regenerate to change code
-        if existing:
+        # Idempotent unless previous attempt failed — failed rows are retried by re-calling /register
+        if existing and existing.assessment_status != "failed":
             return RegisterPackageAcceptedResponse(project_id=project_id, status=existing.assessment_status)
+        if existing and existing.assessment_status == "failed":
+            existing.assessment_status = "pending"
+            existing.study_objective = request.study_objective
+            existing.python_code = ""
+            existing.container_yml = ""
+            db.add(existing)
+            db.commit()
+            background_tasks.add_task(
+                _run_generate_bg,
+                project_id,
+                request.study_objective,
+                request.computation_description,
+                request.data_types,
+            )
+            return RegisterPackageAcceptedResponse(project_id=project_id, status="processing")
         row = PackageSource(
             project_id=project_id,
             source_type="generated",
@@ -201,9 +216,13 @@ def register_package(
     elif request.source_type == "upload":
         if not request.python_code or not request.container_yml:
             raise HTTPException(status_code=400, detail="python_code and container_yml required for source_type='upload'")
-        # Re-callable: overwrite and re-assess on every call (unless already built)
+        # Idempotent: skip if already assessed or built (only re-assess if failed or code changed)
         if existing and existing.build_status == "built":
             return RegisterPackageAcceptedResponse(project_id=project_id, status=existing.assessment_status)
+        if existing and existing.assessment_status == "assessed" \
+                and existing.python_code == request.python_code \
+                and existing.container_yml == request.container_yml:
+            return RegisterPackageAcceptedResponse(project_id=project_id, status="assessed")
         package_name = _parse_package_name(request.container_yml) or f"project_{project_id}_package"
         row = PackageSource(
             project_id=project_id,
@@ -300,8 +319,12 @@ def approve_package(
     working_dir = _WORKING_BASE / f"project_{project_id}" / row.package_name
     working_dir.mkdir(parents=True, exist_ok=True)
     container_yml_path = working_dir / "container.yml"
-    (working_dir / f"{row.package_name}.py").write_text(row.python_code)
-    container_yml_path.write_text(row.container_yml)
+    (working_dir / f"{row.package_name}.py").write_text(row.python_code.replace("\r\n", "\n").replace("\r", "\n"))
+    container_yml_path.write_text(row.container_yml.replace("\r\n", "\n").replace("\r", "\n"))
+    run_sh = working_dir / "run.sh"
+    if not run_sh.exists():
+        run_sh.write_text(f"#!/bin/bash\npython3 /opt/wd/{row.package_name}.py \"$1\"\n")
+        run_sh.chmod(0o755)
 
     result = PackageBuilder().build(working_dir, container_yml_path)
 

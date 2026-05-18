@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 import httpx
 from pathlib import Path
 from app.infrastructure.settings import settings
@@ -119,7 +120,12 @@ class BraneHubService:
             httpx.post(
                 f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/participant-ready",
                 headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
-                json={"user_id": user_id, "brane_node": brane_node, "status": "ready"},
+                json={
+                    "user_id": user_id,
+                    "brane_node": brane_node,
+                    "status": "ready",
+                    "callback_at": datetime.now(timezone.utc).isoformat(),
+                },
                 timeout=10,
             )
         except Exception as exc:
@@ -130,7 +136,10 @@ class BraneHubService:
             httpx.post(
                 f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/participant-deprovisioned",
                 headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
-                json={"user_id": user_id},
+                json={
+                    "user_id": user_id,
+                    "callback_at": datetime.now(timezone.utc).isoformat(),
+                },
                 timeout=10,
             )
         except Exception as exc:

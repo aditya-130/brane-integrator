@@ -197,6 +197,63 @@ def dismissed_workflow(
     return
 
 
+@router.get("/{project_id}/workflows/latest", status_code=200)
+def get_latest_workflow(project_id: int, db_session: Session = Depends(get_db)):
+    workflow = db_session.exec(
+        select(Workflow)
+        .where(Workflow.project_id == project_id)
+        .where(Workflow.status.in_(["generated", "executing", "completed", "failed"]))
+        .order_by(Workflow.created_at.desc())
+    ).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="No workflow found for this project")
+
+    traceability = None
+    if workflow.traceability_report:
+        try:
+            traceability = json.loads(workflow.traceability_report)
+        except Exception:
+            pass
+
+    validation = None
+    if workflow.validation_result:
+        try:
+            v = json.loads(workflow.validation_result)
+            rules = v.get("rules", [])
+            validation = {
+                "passed": sum(1 for r in rules if r.get("passed")),
+                "failed": sum(1 for r in rules if not r.get("passed")),
+                "rules": rules,
+            }
+        except Exception:
+            pass
+
+    execution_result = None
+    if workflow.execution_result:
+        try:
+            execution_result = json.loads(workflow.execution_result)
+        except Exception:
+            pass
+
+    return {
+        "workflow_id": workflow.workflow_id,
+        "project_id": workflow.project_id,
+        "cycle_id": workflow.cycle_id,
+        "script_version": workflow.script_version,
+        "status": workflow.status,
+        "branescript": workflow.branescript,
+        "traceability_report": traceability,
+        "validation": validation,
+        "note": workflow.note,
+        "execution_result": execution_result,
+        "generation_strategy": workflow.generation_strategy,
+        "llm_calls_made": workflow.llm_calls_made,
+        "regeneration_count": workflow.regeneration_count,
+        "triggered_at": workflow.triggered_at,
+        "executed_at": str(workflow.executed_at) if workflow.executed_at else None,
+    }
+
+
 @router.get("/{project_id}/workflows/{workflow_id}/metrics", status_code=200)
 def get_workflow_metrics(
     project_id: int,
@@ -224,6 +281,13 @@ def get_workflow_metrics(
     passed = sum(1 for r in validation_rules if r.get("passed")) if validation_rules else None
     failed = sum(1 for r in validation_rules if not r.get("passed")) if validation_rules else None
 
+    execution_result = None
+    if workflow.execution_result:
+        try:
+            execution_result = json.loads(workflow.execution_result)
+        except Exception:
+            pass
+
     return {
         "workflow_id": workflow.workflow_id,
         "project_id": workflow.project_id,
@@ -233,7 +297,9 @@ def get_workflow_metrics(
         "llm_calls_made": workflow.llm_calls_made,
         "regeneration_count": workflow.regeneration_count,
         "generated_at": workflow.triggered_at,
-        "executed_at": workflow.executed_at,
+        "executed_at": str(workflow.executed_at) if workflow.executed_at else None,
+        "note": workflow.note,
+        "execution_result": execution_result,
         "validation": {
             "passed": passed,
             "failed": failed,

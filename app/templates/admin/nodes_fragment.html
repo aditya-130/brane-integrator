@@ -1,0 +1,41 @@
+{% if not node_rows %}
+<tr><td colspan="8" class="text-center text-muted py-3">No nodes provisioned</td></tr>
+{% endif %}
+{% for n in node_rows %}
+<tr>
+  <td>
+    <code>{{ n.brane_node }}</code>
+  </td>
+  <td>
+    {% if n.node_type == "coordinator" %}
+      <span class="badge bg-primary">coordinator</span>
+    {% else %}
+      <span class="badge bg-info text-dark">participant</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if n.docker_status == "running" %}
+      <span class="badge badge-running">&#9679; running</span>
+    {% elif n.docker_status == "exited" %}
+      <span class="badge badge-exited">&#10005; exited</span>
+    {% elif n.docker_status == "not_found" %}
+      <span class="badge badge-not_found">&#9675; not found</span>
+    {% else %}
+      <span class="badge badge-unknown">? {{ n.docker_status }}</span>
+    {% endif %}
+  </td>
+  <td>
+    <span class="badge badge-{{ n.db_status }}">{{ n.db_status }}</span>
+  </td>
+  <td><code>{{ n.project_id }}</code></td>
+  <td>{{ n.user_id if n.user_id is not none else "—" }}</td>
+  <td class="text-nowrap">
+    <span class="text-muted small">{{ n.port_reg }}</span>
+    <span class="text-muted">/</span>
+    <span class="text-muted small">{{ n.port_job }}</span>
+  </td>
+  <td class="text-muted small text-nowrap">
+    {{ n.provisioned_at.strftime("%Y-%m-%d %H:%M") if n.provisioned_at else "—" }}
+  </td>
+</tr>
+{% endfor %}

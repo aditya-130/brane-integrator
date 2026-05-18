@@ -36,9 +36,22 @@ class TemplateGenerator:
             lines.append(f"let {stat_var} := {config.workflow.local_function}(data_{i});")
             lines.append("")
 
-        args = ", ".join(stat_vars)
+        # Pairwise left-fold: combine takes exactly 2 inputs, so chain for N > 2.
+        # e.g. 4 participants → combine(combine(combine(s1,s2), s3), s4)
         lines.append(f'#[on("{config.workflow.coordinator_node}")]')
-        lines.append(f"let result := {config.workflow.combine_function}({args});")
+        combine_fn = config.workflow.combine_function
+        coordinator = config.workflow.coordinator_node
+        if len(stat_vars) == 1:
+            lines.append(f"let result := {stat_vars[0]};")
+        else:
+            acc_var = "acc_0"
+            lines.append(f"let {acc_var} := {combine_fn}({stat_vars[0]}, {stat_vars[1]});")
+            for i in range(2, len(stat_vars)):
+                next_var = f"acc_{i - 1}"
+                lines.append(f'#[on("{coordinator}")]')
+                lines.append(f"let {next_var} := {combine_fn}({acc_var}, {stat_vars[i]});")
+                acc_var = next_var
+            lines.append(f"let result := {acc_var};")
         lines.append("")
 
         lines.append("return result;")

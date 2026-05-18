@@ -77,11 +77,21 @@ def _find_active_node_for_user(user_id: int, db: Session) -> Optional[Provisione
     ).first()
 
 
+def _is_port_free(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("", port))
+            return True
+        except OSError:
+            return False
+
+
 def _allocate_ports(db: Session) -> PortBlock:
     """
-    Returns the next free block of 5 ports. Reads both ProvisionedNode and
-    CoordinatorNode to find the highest port in use, then returns the next
-    consecutive block. Call inside a DB transaction to prevent races.
+    Returns the next free block of 5 ports. Starts from the block after the
+    highest port in the DB, then scans upward until all 5 ports in the block
+    are actually free at the OS level (handles stale containers not in the DB).
     """
     p_rows = db.exec(select(ProvisionedNode)).all()
     c_rows = db.exec(select(CoordinatorNode)).all()
@@ -96,13 +106,19 @@ def _allocate_ports(db: Session) -> PortBlock:
         max_port = max(all_ports)
         used_blocks = (max_port - _BASE_PORT) // _PORTS_PER_NODE + 1
         base = _BASE_PORT + used_blocks * _PORTS_PER_NODE
-    return PortBlock(
-        reg=base,
-        job=base + 1,
-        chk_deliberation=base + 2,
-        chk_store=base + 3,
-        prx=base + 4,
-    )
+
+    for _ in range(200):
+        candidate = [base, base + 1, base + 2, base + 3, base + 4]
+        if all(_is_port_free(p) for p in candidate):
+            return PortBlock(
+                reg=base,
+                job=base + 1,
+                chk_deliberation=base + 2,
+                chk_store=base + 3,
+                prx=base + 4,
+            )
+        base += _PORTS_PER_NODE
+    raise RuntimeError("Could not find a free port block in range")
 
 
 def _render_node_yml(working_dir: Path, brane_node: str, ports: PortBlock) -> None:
@@ -323,17 +339,7 @@ class NodeProvisioner:
             working_dir = _BRANE_NODES_DIR / brane_node
             working_dir.mkdir(parents=True, exist_ok=True)
 
-            _render_node_yml(working_dir, brane_node, ports)
-            _copy_template_files(working_dir)
-            _register_central_cert(brane_node)
-            _start_node(working_dir)
-            _health_check("localhost", ports)
-            _patch_infra_yml(brane_node, ports)
-            _extend_brane_fwd(brane_node, ports)
-            self._push_package(project_id, db)
-            if dataset_name:
-                _register_dataset(dataset_name)
-
+            # Reserve ports in DB immediately so concurrent provisions don't pick the same block
             row = ProvisionedNode(
                 user_id=user_id,
                 project_id=project_id,
@@ -344,9 +350,25 @@ class NodeProvisioner:
                 port_chk_store=ports.chk_store,
                 port_prx=ports.prx,
                 working_dir=str(working_dir),
-                status="ready",
+                status="provisioning",
                 provisioned_at=datetime.now(timezone.utc),
             )
+            db.add(row)
+            db.commit()
+
+            _render_node_yml(working_dir, brane_node, ports)
+            _copy_template_files(working_dir)
+            _register_central_cert(brane_node)
+            _stop_node(brane_node)  # clear any stale containers from a previous session
+            _start_node(working_dir)
+            _health_check("localhost", ports)
+            _patch_infra_yml(brane_node, ports)
+            _extend_brane_fwd(brane_node, ports)
+            self._push_package(project_id, db)
+            if dataset_name:
+                _register_dataset(dataset_name)
+
+            row.status = "ready"
             db.add(row)
 
             # Upsert ParticipantNodeMap
@@ -364,6 +386,20 @@ class NodeProvisioner:
 
         except Exception as exc:
             logger.error("Provisioning failed for user %d project %d: %s", user_id, project_id, exc)
+            # Remove the placeholder row so the port block isn't permanently reserved
+            try:
+                stale = db.exec(
+                    select(ProvisionedNode).where(
+                        ProvisionedNode.user_id == user_id,
+                        ProvisionedNode.project_id == project_id,
+                        ProvisionedNode.status == "provisioning",
+                    )
+                ).first()
+                if stale:
+                    db.delete(stale)
+                    db.commit()
+            except Exception:
+                pass
             return ProvisionResult(brane_node=brane_node, status="failed", error=str(exc))
 
     def deprovision(self, user_id: int, project_id: int, db: Session) -> None:
@@ -436,15 +472,6 @@ class NodeProvisioner:
             working_dir = _BRANE_NODES_DIR / brane_node
             working_dir.mkdir(parents=True, exist_ok=True)
 
-            _render_node_yml(working_dir, brane_node, ports)
-            _copy_template_files(working_dir)
-            _register_central_cert(brane_node)
-            _start_node(working_dir)
-            _health_check("localhost", ports)
-            _patch_infra_yml(brane_node, ports)
-            _extend_brane_fwd(brane_node, ports)
-            self._push_package(project_id, db)
-
             row = CoordinatorNode(
                 project_id=project_id,
                 brane_node=brane_node,
@@ -454,9 +481,23 @@ class NodeProvisioner:
                 port_chk_store=ports.chk_store,
                 port_prx=ports.prx,
                 working_dir=str(working_dir),
-                status="ready",
+                status="provisioning",
                 provisioned_at=datetime.now(timezone.utc),
             )
+            db.add(row)
+            db.commit()
+
+            _render_node_yml(working_dir, brane_node, ports)
+            _copy_template_files(working_dir)
+            _register_central_cert(brane_node)
+            _stop_node(brane_node)  # clear any stale containers from a previous session
+            _start_node(working_dir)
+            _health_check("localhost", ports)
+            _patch_infra_yml(brane_node, ports)
+            _extend_brane_fwd(brane_node, ports)
+            self._push_package(project_id, db)
+
+            row.status = "ready"
             db.add(row)
 
             from app.domain.infra import ProjectConfig
@@ -483,6 +524,18 @@ class NodeProvisioner:
 
         except Exception as exc:
             logger.error("Coordinator provisioning failed for project %d: %s", project_id, exc)
+            try:
+                stale = db.exec(
+                    select(CoordinatorNode).where(
+                        CoordinatorNode.project_id == project_id,
+                        CoordinatorNode.status == "provisioning",
+                    )
+                ).first()
+                if stale:
+                    db.delete(stale)
+                    db.commit()
+            except Exception:
+                pass
             return ProvisionResult(brane_node=brane_node, status="failed", error=str(exc))
 
     def reconcile(self, db: Session) -> None:

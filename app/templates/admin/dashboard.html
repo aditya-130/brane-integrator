@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brane Integrator — Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    body { background: #f8f9fa; }
+    .badge-running  { background: #198754; }
+    .badge-exited   { background: #dc3545; }
+    .badge-not_found{ background: #6c757d; }
+    .badge-unknown  { background: #ffc107; color: #212529; }
+    .badge-provisioning { background: #0dcaf0; color: #212529; }
+    .badge-deprovisioned { background: #6c757d; }
+    .badge-ready    { background: #198754; }
+    .badge-failed   { background: #dc3545; }
+    .cycle-completed { color: #198754; font-weight: 600; }
+    .cycle-failed    { color: #dc3545; font-weight: 600; }
+    .cycle-executing { color: #0dcaf0; font-weight: 600; }
+    .cycle-generating{ color: #6f42c1; font-weight: 600; }
+    .htmx-indicator  { display: none; }
+    .htmx-request .htmx-indicator { display: inline-block; }
+    .section-card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    code { font-size: .82em; }
+  </style>
+</head>
+<body>
+<div class="container-fluid py-4 px-4">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h4 class="mb-0 fw-bold">Brane Integrator &mdash; Admin</h4>
+    <span class="text-muted small">Auto-refreshes nodes every 5 s</span>
+  </div>
+
+  <!-- ── NODES ───────────────────────────────────────────────────────── -->
+  <div class="card section-card mb-4">
+    <div class="card-header bg-white fw-semibold">Nodes</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Node</th>
+              <th>Type</th>
+              <th>Docker</th>
+              <th>DB&nbsp;Status</th>
+              <th>Project</th>
+              <th>User&nbsp;ID</th>
+              <th>Ports (reg / job)</th>
+              <th>Provisioned at</th>
+            </tr>
+          </thead>
+          <tbody id="nodes-tbody"
+                 hx-get="/admin/nodes/status"
+                 hx-trigger="every 5s"
+                 hx-swap="innerHTML">
+            {% include "admin/nodes_fragment.html" %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PROJECTS ────────────────────────────────────────────────────── -->
+  <div class="card section-card mb-4">
+    <div class="card-header bg-white fw-semibold">Projects</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Project&nbsp;ID</th>
+              <th>Package</th>
+              <th>Build</th>
+              <th>Coordinator node</th>
+              <th>Active nodes</th>
+              <th>Latest cycle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if not project_rows %}
+            <tr><td colspan="6" class="text-center text-muted py-3">No projects registered</td></tr>
+            {% endif %}
+            {% for p in project_rows %}
+            <tr>
+              <td><code>{{ p.project_id }}</code></td>
+              <td>
+                <span class="fw-semibold">{{ p.package_name }}</span>
+                <span class="text-muted small">v{{ p.package_version }}</span>
+              </td>
+              <td>
+                {% if p.build_status == "built" %}
+                  <span class="badge bg-success">built</span>
+                {% elif p.build_status == "failed" %}
+                  <span class="badge bg-danger">failed</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ p.build_status }}</span>
+                {% endif %}
+              </td>
+              <td><code>{{ p.coordinator_node or "—" }}</code></td>
+              <td>{{ p.active_node_count }}</td>
+              <td>
+                {% if p.latest_cycle_id is not none %}
+                  <span class="me-1 text-muted small">cycle {{ p.latest_cycle_id }}</span>
+                  <span class="cycle-{{ p.latest_cycle_status }}">{{ p.latest_cycle_status }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACTIONS ─────────────────────────────────────────────────────── -->
+  <div class="row g-3">
+
+    <!-- Provision -->
+    <div class="col-md-4">
+      <div class="card section-card h-100">
+        <div class="card-header bg-white fw-semibold">Provision participant node</div>
+        <div class="card-body">
+          <form hx-post="/infra/provision"
+                hx-headers='{"X-API-Key": "{{ api_key }}"}'
+                hx-target="#provision-result"
+                hx-swap="innerHTML">
+            <div class="mb-2">
+              <label class="form-label small mb-1">User ID</label>
+              <input type="number" name="user_id" class="form-control form-control-sm" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small mb-1">Project ID</label>
+              <input type="number" name="project_id" class="form-control form-control-sm" required>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">
+              <span class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+              Provision
+            </button>
+          </form>
+          <div id="provision-result" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deprovision -->
+    <div class="col-md-4">
+      <div class="card section-card h-100">
+        <div class="card-header bg-white fw-semibold">Deprovision participant node</div>
+        <div class="card-body">
+          <form hx-post="/infra/deprovision"
+                hx-headers='{"X-API-Key": "{{ api_key }}"}'
+                hx-target="#deprovision-result"
+                hx-swap="innerHTML">
+            <div class="mb-2">
+              <label class="form-label small mb-1">User ID</label>
+              <input type="number" name="user_id" class="form-control form-control-sm" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small mb-1">Project ID</label>
+              <input type="number" name="project_id" class="form-control form-control-sm" required>
+            </div>
+            <button type="submit" class="btn btn-sm btn-danger">
+              <span class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+              Deprovision
+            </button>
+          </form>
+          <div id="deprovision-result" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Register dataset -->
+    <div class="col-md-4">
+      <div class="card section-card h-100">
+        <div class="card-header bg-white fw-semibold">Register dataset</div>
+        <div class="card-body">
+          <form hx-post="/admin/datasets/register"
+                hx-target="#dataset-result"
+                hx-swap="innerHTML">
+            <div class="mb-3">
+              <label class="form-label small mb-1">Dataset name</label>
+              <input type="text" name="dataset_name" class="form-control form-control-sm"
+                     placeholder="e.g. hospital_a" required>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success">
+              <span class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+              Register
+            </button>
+          </form>
+          <div id="dataset-result" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Force push package -->
+    <div class="col-md-4">
+      <div class="card section-card h-100">
+        <div class="card-header bg-white fw-semibold">Force push package to node</div>
+        <div class="card-body">
+          <form hx-post="/admin/nodes/__node__/push-package"
+                hx-target="#push-result"
+                hx-swap="innerHTML"
+                id="push-form">
+            <div class="mb-3">
+              <label class="form-label small mb-1">Node name</label>
+              <input type="text" id="push-node-input" name="brane_node"
+                     class="form-control form-control-sm"
+                     placeholder="e.g. participant-7"
+                     oninput="document.getElementById('push-form').setAttribute('hx-post', '/admin/nodes/' + this.value + '/push-package')"
+                     required>
+            </div>
+            <button type="submit" class="btn btn-sm btn-secondary">
+              <span class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+              Push
+            </button>
+          </form>
+          <div id="push-result" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row -->
+</div><!-- /container -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // htmx forms that POST JSON-encoded bodies (infra endpoints expect JSON)
+  document.body.addEventListener("htmx:configRequest", function(evt) {
+    var form = evt.detail.elt.closest("form");
+    if (!form) return;
+    var action = form.getAttribute("hx-post") || "";
+    if (action.startsWith("/infra/")) {
+      // convert form data to JSON
+      var data = {};
+      new FormData(form).forEach(function(v, k) { data[k] = parseInt(v) || v; });
+      evt.detail.parameters = data;
+      evt.detail.headers["Content-Type"] = "application/json";
+    }
+  });
+</script>
+</body>
+</html>

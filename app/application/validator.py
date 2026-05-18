@@ -119,7 +119,22 @@ class Validator:
                 message=None if present else f"Missing dataset ref: {p.dataset_name} for {p.brane_node}",
             ))
 
-        # Rule 8: verify package and functions are registered in the Brane API
+        # Rule 8: combine function called with exactly 2 args on every call site
+        import re as _re
+        combine_fn = config.workflow.combine_function
+        for m in _re.finditer(rf'\b{_re.escape(combine_fn)}\s*\(([^)]+)\)', branescript):
+            args = [a.strip() for a in m.group(1).split(',') if a.strip()]
+            if len(args) != 2:
+                rules.append(RuleResult(
+                    rule="combine_exactly_two_args",
+                    passed=False,
+                    message=f"{combine_fn} must be called with exactly 2 arguments but got {len(args)}: {m.group(0)[:60]}. For N>2 participants chain as left-fold: let acc := combine(a,b); let result := combine(acc,c);",
+                ))
+                break
+        else:
+            rules.append(RuleResult(rule="combine_exactly_two_args", passed=True, message=None))
+
+        # Rule 9: verify package and functions are registered in the Brane API
         # brane workflow check is broken in nightly (constructs URLs without http:// scheme),
         # so we query the GraphQL API directly instead.
         rules.extend(self._check_package_registered(config))

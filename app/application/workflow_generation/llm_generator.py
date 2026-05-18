@@ -19,12 +19,12 @@ class LlmGenerator:
         self.llm_service = llm_service
         self.llm_calls_made = 0
 
-    def generate(self, config: IntegratorConfig, interpreted: InterpretedWorkflow) -> str:
+    def generate(self, config: IntegratorConfig, interpreted: InterpretedWorkflow, container_yml: str | None = None) -> str:
         from app.application.validator import Validator
 
         self.llm_calls_made = 0
         system = LLM_GENERATOR_SYSTEM
-        user = self._build_user_prompt(config, interpreted)
+        user = self._build_user_prompt(config, interpreted, container_yml)
 
         logger.info("LlmGenerator: sending first prompt to LLM (model call #1)")
         raw = self.llm_service.complete(system, user)
@@ -45,6 +45,7 @@ class LlmGenerator:
             logger.warning("LlmGenerator: first attempt failed validation, retrying. Failures:\n%s", failures)
 
             retry_user = user + LLM_GENERATOR_RETRY_SUFFIX.format(failures=failures)
+
             logger.info("LlmGenerator: sending retry prompt to LLM (model call #2)")
             raw = self.llm_service.complete(system, retry_user)
             self.llm_calls_made += 1
@@ -59,7 +60,7 @@ class LlmGenerator:
 
         return branescript
 
-    def _build_user_prompt(self, config: IntegratorConfig, interpreted: InterpretedWorkflow) -> str:
+    def _build_user_prompt(self, config: IntegratorConfig, interpreted: InterpretedWorkflow, container_yml: str | None = None) -> str:
         participants_lines = []
         for i, p in enumerate(interpreted.participants, start=1):
             tags = ", ".join(p.tag_annotations) if p.tag_annotations else "none"
@@ -70,6 +71,8 @@ class LlmGenerator:
 
         wf_tags_block = "\n".join(interpreted.wf_tags) if interpreted.wf_tags else "none"
 
+        container_yml_block = f"\nPackage container.yml (use this to understand exact function signatures and argument counts):\n```yaml\n{container_yml}\n```\n" if container_yml else ""
+
         return LLM_GENERATOR_USER.format(
             package=config.workflow.package,
             local_function=config.workflow.local_function,
@@ -77,6 +80,7 @@ class LlmGenerator:
             coordinator_node=config.workflow.coordinator_node,
             participants_block=participants_block,
             wf_tags_block=wf_tags_block,
+            container_yml_block=container_yml_block,
         )
 
     def _extract_branescript(self, raw: str) -> str:

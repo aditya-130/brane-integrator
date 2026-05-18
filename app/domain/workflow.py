@@ -17,6 +17,8 @@ class Workflow(SQLModel, table=True):
     llm_calls_made: int = 0
     regeneration_count: int = 0
     status: str = "pending" # pending | generating | generated | approved | executing | completed | failed | invalidated
+    note: Optional[str] = None
+    execution_result: Optional[str] = None  # JSON-serialised result from Brane
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_at: Optional[datetime] = None
 

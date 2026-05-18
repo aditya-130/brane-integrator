@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.infrastructure.database import init_db, engine
 from app.infrastructure.settings import settings
-from app.api import infra, workflow, packages
+from app.api import infra, workflow, packages, admin
 from app.domain.workflow import Workflow
 from sqlmodel import Session, select
 
@@ -107,6 +107,8 @@ app = FastAPI(title="Brane Integrator", lifespan=lifespan)
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
+    if request.url.path.startswith("/admin"):
+        return await call_next(request)
     provided = request.headers.get("X-API-Key", "")
     if not secrets.compare_digest(settings.BRANE_INTEGRATOR_API_KEY, provided):
         return JSONResponse(
@@ -119,3 +121,4 @@ async def verify_api_key(request: Request, call_next):
 app.include_router(infra.router)
 app.include_router(workflow.router)
 app.include_router(packages.router)
+app.include_router(admin.router)

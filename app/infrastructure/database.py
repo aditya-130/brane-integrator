@@ -23,6 +23,8 @@ def _migrate():
         "ALTER TABLE packagesource ADD COLUMN study_objective TEXT DEFAULT ''",
         "ALTER TABLE packagesource ADD COLUMN local_function TEXT",
         "ALTER TABLE packagesource ADD COLUMN combine_function TEXT",
+        "ALTER TABLE workflow ADD COLUMN note TEXT",
+        "ALTER TABLE workflow ADD COLUMN execution_result TEXT",
     ]
     with engine.connect() as conn:
         for sql in migrations:

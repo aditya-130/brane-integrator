@@ -138,13 +138,22 @@ RULE 4: The exact order for each participant block is:
 #[tag("identifiability.VALUE")]
 let result_N := local_function(data_N);
 
-RULE 5: The exact order for the combine block is:
+RULE 5: The combine function ALWAYS takes EXACTLY 2 arguments — never more, never less.
+For N>2 participants you MUST chain calls as a left-fold. For 3 participants:
 #[on("coordinator-node")]
-let result := combine_function(result_1, result_2, ...);
+let acc_0 := combine_fn(stats_1, stats_2);
+#[on("coordinator-node")]
+let result := combine_fn(acc_0, stats_3);
+For 4 participants:
+#[on("coordinator-node")]
+let acc_0 := combine_fn(stats_1, stats_2);
+#[on("coordinator-node")]
+let acc_1 := combine_fn(acc_0, stats_3);
+#[on("coordinator-node")]
+let result := combine_fn(acc_1, stats_4);
+NEVER write combine_fn(stats_1, stats_2, stats_3) — this will crash at runtime.
 
---- COMPLETE EXAMPLE ---
-Here is a correct example for a 2-participant project:
-
+--- COMPLETE EXAMPLE (2 participants) ---
 import mypackage;
 
 #![wf_tag("sensitivity.High")]
@@ -166,6 +175,29 @@ let result := combine_fn(stats_1, stats_2);
 
 return result;
 
+--- COMPLETE EXAMPLE (3 participants, left-fold) ---
+import mypackage;
+
+let data_1 := new Data { name := "dataset-site1" };
+let data_2 := new Data { name := "dataset-site2" };
+let data_3 := new Data { name := "dataset-site3" };
+
+#[on("site1")]
+let stats_1 := local_fn(data_1);
+
+#[on("site2")]
+let stats_2 := local_fn(data_2);
+
+#[on("site3")]
+let stats_3 := local_fn(data_3);
+
+#[on("central")]
+let acc_0 := combine_fn(stats_1, stats_2);
+#[on("central")]
+let result := combine_fn(acc_0, stats_3);
+
+return result;
+
 --- GENERATION RULES ---
 1. Start with: import <package>;
 2. Place all #![wf_tag()] lines immediately after import, one per line, NO semicolons.
@@ -182,7 +214,7 @@ Package: {package}
 Local function (runs at each participant): {local_function}
 Combine function (runs at coordinator): {combine_function}
 Coordinator node: {coordinator_node}
-
+{container_yml_block}
 Participants:
 {participants_block}
 
@@ -354,24 +386,30 @@ PACKAGE_VALIDATOR_SYSTEM = """You are an expert Brane package reviewer for feder
 --- HOW BRANE EXECUTES PACKAGES ---
 Output must be printed to stdout as: print(json.dumps({"output": ...})). The container.yml is a Brane-specific YAML (NOT docker-compose) with fields: name, version, kind: ecu, entrypoint (kind: task, exec: filename), actions (one per function with command.args, input, output types).
 
-Data type inputs arrive as a plain file path string in os.environ — do NOT json.loads() them. Non-Data inputs (numbers, arrays, strings) arrive as JSON-encoded strings and must be parsed with json.loads().
+INPUT HANDLING — this is critical, get it right:
+- "Data" type inputs: arrive as a plain file path string in os.environ. Read with os.environ["VAR"] directly — do NOT json.loads() them.
+- "IntermediateResult" type inputs: arrive as a JSON-encoded file path string in os.environ. Read with json.loads(os.environ["VAR"]) — this IS correct and expected.
+- "string" / "integer" / "real" type inputs: arrive as JSON-encoded values. Read with json.loads(os.environ["VAR"]) — this IS correct and expected.
+
+OUTPUT HANDLING:
+- When a function's output type in container.yml is "string", the output value must be a JSON-encoded string: print(json.dumps({"output": json.dumps(result)})) — the double json.dumps is correct and intentional.
+- When a function's output type is an object/struct, use: print(json.dumps({"output": result})).
+- The entrypoint exec field references a shell script (e.g. run.sh) that is auto-generated at build time — do NOT flag a missing run.sh as an issue.
 
 --- WHAT TO CHECK ---
 1. Brane compatibility
-   - For Data inputs: does the function read os.environ["VAR"] as a plain path and open the file directly? (NOT json.loads on a Data input)
-   - For non-Data inputs: does the function use json.loads(os.environ["VAR"])?
-   - Does each function output via print(json.dumps({"output": ...}))?
+   - For Data inputs: does the function read os.environ["VAR"] as a plain path? (NOT json.loads)
+   - For IntermediateResult or string inputs: does the function use json.loads(os.environ["VAR"])? This is correct.
+   - Does each function output via print(json.dumps({"output": ...}))? For string output type, double json.dumps is correct.
    - Is the container.yml in Brane format (name/version/kind/entrypoint/actions) — NOT docker-compose format?
    - Does container.yml declare all functions as actions with input/output types?
-   - Is the entrypoint exec field correct?
 
 2. Federated privacy correctness
    - Does the local function return only aggregates, never raw records or individual rows?
    - Is there any risk of raw data appearing in the output?
 
 3. Combine function correctness
-   - Does the combine function accept a variable-length list/array of results?
-   - Would it break if given 3, 5, or 10 participant results instead of 2?
+   - The combine function takes exactly 2 inputs and is called in a chained left-fold for N > 2 participants. This is correct — do NOT flag a 2-input combine as wrong.
 
 4. Study objective alignment
    - Does the computation actually address what the study objective asks for?
