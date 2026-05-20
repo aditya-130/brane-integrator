@@ -53,7 +53,21 @@ class PackageBuilder:
             logger.error("PackageBuilder.build error: %s", e)
             return BuildResult(success=False, stderr=str(e))
 
+    def _fix_packages_dir_ownership(self) -> None:
+        """WSL2/Docker bind-mount quirk: brane-api's packages dir appears as root:root
+        inside the container. Chown it to the brane user so the push HTTP handler can write."""
+        try:
+            container = settings.BRANE_API_CONTAINER or "brane-api"
+            packages_path = settings.BRANE_CENTRAL_PACKAGES_PATH or "/home/aditya/brane/nodes/central/packages"
+            subprocess.run(
+                ["docker", "exec", "-u", "root", container, "chown", "brane:brane", packages_path],
+                capture_output=True, timeout=10,
+            )
+        except Exception as e:
+            logger.warning("Could not fix packages dir ownership: %s", e)
+
     def push(self, package_name: str) -> bool:
+        self._fix_packages_dir_ownership()
         for attempt in range(1, _PUSH_RETRIES + 1):
             try:
                 proc = subprocess.run(

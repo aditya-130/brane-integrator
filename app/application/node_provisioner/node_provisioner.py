@@ -127,6 +127,8 @@ def _render_node_yml(working_dir: Path, brane_node: str, ports: PortBlock) -> No
     rendered = tmpl.render(
         brane_node=brane_node,
         working_dir=str(working_dir),
+        data_dir=str(Path.home() / "brane" / "data"),
+        results_dir=str(Path.home() / "brane" / "results"),
         port_reg=ports.reg,
         port_job=ports.job,
         port_chk_deliberation=ports.chk_deliberation,

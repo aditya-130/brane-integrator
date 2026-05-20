@@ -247,11 +247,12 @@ Brane runs your Python file inside a Docker container. Inputs arrive as environm
 
 Brane captures stdout as the function's return value. Do NOT use Python return statements for output.
 
-IMPORTANT — Data inputs: When a function receives a Brane Data type, the environment variable contains the FILE PATH to the data as a plain string (not JSON). Read it with:
-  path = os.environ["MY_DATA"]   # plain string path, do NOT json.loads() this
+IMPORTANT — Data inputs: When a function receives a Brane Data type, Brane JSON-encodes the file path before passing it as an env var. The path arrives as a quoted JSON string (e.g. "/data/my-dataset" with surrounding quotes). You MUST use json.loads() to extract the actual path:
+  path = json.loads(os.environ["MY_DATA"])   # MUST json.loads — Brane wraps the path in JSON quotes
   # then open/read the file directly, e.g. with open(path) or csv.reader
+  # Do NOT use os.environ["MY_DATA"] directly — it will include surrounding quotes and cause FileNotFoundError.
 
-Non-Data inputs (numbers, strings, arrays) arrive as JSON-encoded strings:
+Non-Data inputs (numbers, strings, arrays) also arrive as JSON-encoded strings:
   value = json.loads(os.environ["MY_INPUT"])
 
 --- THE TWO FUNCTIONS YOU MUST GENERATE ---
@@ -282,7 +283,7 @@ Python file (mean_age.py):
 
   def compute_local():
       try:
-          path = os.environ["LOCAL_DATA"]   # Data type: plain file path
+          path = json.loads(os.environ["LOCAL_DATA"])   # Data type: MUST json.loads — Brane JSON-encodes the path
           ages = []
           with open(path, newline="") as f:
               reader = csv.DictReader(f)
@@ -387,13 +388,12 @@ PACKAGE_VALIDATOR_SYSTEM = """You are an expert Brane package reviewer for feder
 Output must be printed to stdout as: print(json.dumps({"output": ...})). The container.yml is a Brane-specific YAML (NOT docker-compose) with fields: name, version, kind: ecu, entrypoint (kind: task, exec: filename), actions (one per function with command.args, input, output types).
 
 INPUT HANDLING — this is critical, get it right:
-- "Data" type inputs: arrive as a plain file path string in os.environ. Read with os.environ["VAR"] directly — do NOT json.loads() them.
-- "IntermediateResult" type inputs: arrive as a JSON-encoded file path string in os.environ. Read with json.loads(os.environ["VAR"]) — this IS correct and expected.
+- "Data" type inputs: Brane JSON-encodes the file path before passing it as an env var. A dataset named "my-data" arrives as the JSON string "/data/my-data" (with surrounding quotes). You MUST read it with json.loads(os.environ["VAR"]) to get the plain path. Using os.environ["VAR"] directly (without json.loads) will give you a quoted string and cause FileNotFoundError. json.loads() on a Data env var is CORRECT and REQUIRED.
 - "string" / "integer" / "real" type inputs: arrive as JSON-encoded values. Read with json.loads(os.environ["VAR"]) — this IS correct and expected.
 
 OUTPUT HANDLING:
-- When a function's output type in container.yml is "string", the output value must be a JSON-encoded string: print(json.dumps({"output": json.dumps(result)})) — the double json.dumps is correct and intentional.
-- When a function's output type is an object/struct, use: print(json.dumps({"output": result})).
+- When a function's output type in container.yml is "string", the value stored in "output" must itself be a JSON-encoded string. This means you MUST double-encode: print(json.dumps({"output": json.dumps(result)})) — the inner json.dumps(result) converts the result dict to a string, and the outer json.dumps wraps the Brane envelope. This double json.dumps is CORRECT and REQUIRED for string output types. Do NOT flag it as an issue.
+- When a function's output type is "Any" or an object/struct, use: print(json.dumps({"output": result})).
 - The entrypoint exec field references a shell script (e.g. run.sh) that is auto-generated at build time — do NOT flag a missing run.sh as an issue.
 
 --- WHAT TO CHECK ---

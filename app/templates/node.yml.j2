@@ -14,8 +14,8 @@ node: !worker
     policy_store_secret: {{ working_dir }}/policy_store_secret.json
     policy_audit_log: null
     proxy: {{ working_dir }}/proxy.yml
-    data: /home/aditya/brane/data
-    results: /home/aditya/brane/results
+    data: {{ data_dir }}
+    results: {{ results_dir }}
     temp_data: /tmp/data
     temp_results: /tmp/results
   services:

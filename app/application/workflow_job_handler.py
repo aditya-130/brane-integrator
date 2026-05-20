@@ -16,8 +16,10 @@ from app.application.prompt_builder import PromptBuilder
 from app.application.workflow_generation.template_generator import TemplateGenerator
 from app.application.workflow_generation.llm_generator import LlmGenerator
 from app.application.validator import Validator
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.domain.workflow import Workflow
+from app.domain.package import PackageSource
+from app.application.package_manager.package_builder import PackageBuilder
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.llm_service import LlmService
 
@@ -150,7 +152,20 @@ class WorkflowJobHandler:
         self.db.add(workflow)
         self.db.commit()
 
-        # 2. strip tag annotations before submitting to Brane
+        # 2. Push package to all ready nodes before running.
+        # Provision-time push is unreliable under concurrent provisions (Bug 11) —
+        # doing it here guarantees every node has the latest image on every execution.
+        try:
+            pkg = self.db.exec(
+                select(PackageSource).where(PackageSource.project_id == workflow.project_id)
+            ).first()
+            if pkg and pkg.build_status == "built":
+                PackageBuilder().push(pkg.package_name)
+                logger.info("[%s] Pre-execution push: %s", workflow_id, pkg.package_name)
+        except Exception as exc:
+            logger.warning("[%s] Pre-execution push failed (continuing): %s", workflow_id, exc)
+
+        # 3. Strip tag annotations before submitting to Brane
         #
         # The generated BraneScript (stored in DB) includes #[tag()] and #![wf_tag()]
         # annotations produced by the PolicyInterpreter. These constructs are correct
@@ -177,7 +192,7 @@ class WorkflowJobHandler:
             f.write(executable_script)
             tmpfile = f.name
 
-        # 3. run brane CLI — Popen so handle_abort/handle_dismissed can kill the process
+        # 4. run brane CLI — Popen so handle_abort/handle_dismissed can kill the process
         start_time = time.time()
         proc = subprocess.Popen(
             ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
@@ -195,12 +210,12 @@ class WorkflowJobHandler:
             _running_processes.pop(workflow_id, None)
             os.unlink(tmpfile)
 
-        # 4. if an external stop (abort/dismissed) killed the process, hand off to that handler
+        # 5. if an external stop (abort/dismissed) killed the process, hand off to that handler
         if proc.returncode < 0 and workflow_id in _aborted_workflows:
             _aborted_workflows.discard(workflow_id)
             return
 
-        # 5. parse result and update status
+        # 6. parse result and update status
         duration = int(time.time() - start_time)
         match = re.search(r"Workflow returned value '(.+)'", stdout)
         if proc.returncode == 0 and match:
