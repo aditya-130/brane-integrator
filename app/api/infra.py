@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from app.application.node_provisioner.node_provisioner import NodeProvisioner
 from app.domain.infra import ParticipantNodeMap, ProjectConfig
 from app.infrastructure.branehub_service import BraneHubService
-from app.infrastructure.database import get_db
+from app.infrastructure.database import engine, get_db
 from app.infrastructure.dtos import (
     DeprovisionRequest,
     ParticipantNodeMappingRequest,
@@ -22,17 +22,23 @@ _branehub = BraneHubService()
 
 
 @router.post("/provision", response_model=ProvisionResponse)
-async def provision_node(request: ProvisionRequest, db_session: Session = Depends(get_db)):
+async def provision_node(request: ProvisionRequest):
+    # Return immediately — provisioning runs in the background and notifies BraneHub
+    # via send_participant_ready when done. This avoids BraneHub's 60s HTTP timeout
+    # being shorter than the provisioner's worst-case runtime (~180s).
+    user_id = request.user_id
+    project_id = request.project_id
+    brane_node = f"participant-{user_id}"
+
+    def _run():
+        with Session(engine) as db:
+            result = _provisioner.provision(user_id, project_id, db)
+            if result.status == "ready":
+                _branehub.send_participant_ready(project_id, user_id, result.brane_node)
+
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(
-        None, lambda: _provisioner.provision(request.user_id, request.project_id, db_session, request.dataset_name)
-    )
-    if result.status == "ready":
-        loop.run_in_executor(
-            None,
-            lambda: _branehub.send_participant_ready(request.project_id, request.user_id, result.brane_node),
-        )
-    return ProvisionResponse(brane_node=result.brane_node, status=result.status, error=result.error)
+    loop.run_in_executor(None, _run)
+    return ProvisionResponse(brane_node=brane_node, status="provisioning", error=None)
 
 
 @router.post("/provision-coordinator", response_model=ProvisionResponse)

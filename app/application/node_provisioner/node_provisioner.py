@@ -216,32 +216,6 @@ def _get_container_ip(container_name: str, network: str) -> str:
     return result.stdout.strip()
 
 
-def _register_dataset(dataset_name: str) -> None:
-    """
-    Creates data.yml in the dataset directory and runs brane data build
-    so the dataset is available to workflows running on any node that
-    has access to ~/brane/data.
-    """
-    data_dir = Path.home() / "brane" / "data" / dataset_name
-    data_yml = data_dir / "data.yml"
-
-    if not data_dir.exists():
-        logger.warning("Dataset directory %s does not exist — skipping registration", data_dir)
-        return
-
-    if not data_yml.exists():
-        data_yml.write_text(f"name: {dataset_name}\n\naccess: !file\n  path: ./patients.csv\n")
-        logger.info("Created data.yml for %s", dataset_name)
-
-    result = subprocess.run(
-        ["brane", "data", "build", str(data_yml)],
-        capture_output=True, text=True, timeout=30, env=_CMD_ENV,
-    )
-    if result.returncode == 0:
-        logger.info("Registered dataset %s", dataset_name)
-    else:
-        logger.warning("brane data build failed for %s: %s", dataset_name, result.stderr)
-
 
 def _extend_brane_fwd(brane_node: str, ports: PortBlock) -> None:
     """
@@ -295,7 +269,7 @@ def _stop_node(brane_node: str) -> None:
 
 class NodeProvisioner:
 
-    def provision(self, user_id: int, project_id: int, db: Session, dataset_name: Optional[str] = None) -> ProvisionResult:
+    def provision(self, user_id: int, project_id: int, db: Session) -> ProvisionResult:
         brane_node = f"participant-{user_id}"
 
         # ── Idempotency: already provisioned for this exact project ──
@@ -308,6 +282,18 @@ class NodeProvisioner:
         ).first()
         if existing:
             logger.info("Node %s already ready for project %d", brane_node, project_id)
+            return ProvisionResult(brane_node=brane_node, status="ready")
+
+        # ── Idempotency: provision already in flight for this project ──
+        in_progress = db.exec(
+            select(ProvisionedNode).where(
+                ProvisionedNode.user_id == user_id,
+                ProvisionedNode.project_id == project_id,
+                ProvisionedNode.status == "provisioning",
+            )
+        ).first()
+        if in_progress:
+            logger.info("Node %s already provisioning for project %d — ignoring duplicate", brane_node, project_id)
             return ProvisionResult(brane_node=brane_node, status="ready")
 
         # ── Node already running for a different project ──
@@ -367,8 +353,6 @@ class NodeProvisioner:
             _patch_infra_yml(brane_node, ports)
             _extend_brane_fwd(brane_node, ports)
             self._push_package(project_id, db)
-            if dataset_name:
-                _register_dataset(dataset_name)
 
             row.status = "ready"
             db.add(row)
@@ -388,6 +372,11 @@ class NodeProvisioner:
 
         except Exception as exc:
             logger.error("Provisioning failed for user %d project %d: %s", user_id, project_id, exc)
+            # Stop any containers that were started before the failure
+            try:
+                _stop_node(brane_node)
+            except Exception:
+                pass
             # Remove the placeholder row so the port block isn't permanently reserved
             try:
                 stale = db.exec(

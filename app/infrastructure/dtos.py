@@ -105,12 +105,11 @@ class ValidatePackageResponse(BaseModel):
 class ProvisionRequest(BaseModel):
     user_id: int
     project_id: int
-    dataset_name: Optional[str] = None
 
 
 class ProvisionResponse(BaseModel):
     brane_node: str
-    status: str          # "ready" | "failed"
+    status: str          # "provisioning" | "ready" | "failed"
     error: Optional[str] = None
 
 
