@@ -115,6 +115,27 @@ class BraneHubService:
         if not response.is_success:
             logger.warning("BraneHub returned %s on send_completed: %s", response.status_code, response.text)
 
+    def send_coordinator_ready(self, project_id: int, status: str, error: str | None = None) -> None:
+        if not settings.BRANEHUB_BASE_URL:
+            logger.info(
+                "BRANEHUB_BASE_URL not set — skipping coordinator-ready callback (project=%d status=%s)",
+                project_id, status,
+            )
+            return
+        try:
+            httpx.post(
+                f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/coordinator-ready",
+                headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
+                json={
+                    "status": status,
+                    "error": error,
+                    "callback_at": datetime.now(timezone.utc).isoformat(),
+                },
+                timeout=10,
+            )
+        except Exception as exc:
+            logger.warning("BraneHub coordinator-ready callback failed: %s", exc)
+
     def send_participant_ready(self, project_id: int, user_id: int, brane_node: str) -> None:
         try:
             httpx.post(

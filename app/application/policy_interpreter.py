@@ -42,14 +42,17 @@ class InterpretedWorkflow(BaseModel):
 
 class PolicyInterpreter:
     def interpret(self, config: IntegratorConfig) -> InterpretedWorkflow:
+        # Iterate WORKFLOW_REGISTRY directly so canonical order (data_sensitivity → legal_basis)
+        # is explicit rather than a side effect of Pydantic's model_dump() field order
+        project_data = config.project.model_dump()
         wf_tags = []
-        for field, value in config.project.model_dump().items():
-            if field in WF_SKIP_FIELDS or not value:
-                continue
-            if field in WORKFLOW_REGISTRY:
-                wf_tags.append(WORKFLOW_REGISTRY[field](value))
+        for field, fn in WORKFLOW_REGISTRY.items():
+            value = project_data.get(field)
+            if value:
+                wf_tags.append(fn(value))
 
         # Jurisdictions: collect from all participants, deduplicate, emit one wf_tag per unique value
+        # These always follow data_sensitivity and legal_basis in the tag block
         seen_jurisdictions: set[str] = set()
         for p in config.participants:
             for j in (p.jurisdictions or []):
@@ -65,7 +68,7 @@ class PolicyInterpreter:
             flagged = []
 
             for field, value in participant.model_dump().items():
-                if field in PARTICIPANT_SKIP_FIELDS or value is None:
+                if field in PARTICIPANT_SKIP_FIELDS or not value:
                     continue
                 if field in PARTICIPANT_REGISTRY:
                     construct = PARTICIPANT_REGISTRY[field](value)

@@ -254,6 +254,44 @@ def _remove_from_infra_yml(brane_node: str) -> None:
         yaml.dump(infra, f, default_flow_style=False, allow_unicode=True)
 
 
+def _register_dataset(dataset_name: str, file_bytes: bytes | None = None) -> None:
+    """
+    Simulate a participant registering their dataset on their provisioned node.
+    In production this is done by hospital IT on their own server.
+    Steps: write dataset.csv (if uploaded), write data.yml, run brane data build.
+    """
+    data_dir = Path.home() / "brane" / "data" / dataset_name
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    if file_bytes is not None:
+        (data_dir / "dataset.csv").write_bytes(file_bytes)
+        logger.info("Wrote dataset.csv (%d bytes) to %s", len(file_bytes), data_dir)
+
+    csv_path = data_dir / "dataset.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"No dataset.csv found at {csv_path}. Upload a CSV file to register."
+        )
+
+    data_yml = data_dir / "data.yml"
+    data_yml.write_text(
+        f"name: {dataset_name}\n\naccess: !file\n  path: ./dataset.csv\n"
+    )
+    logger.info("Wrote data.yml for dataset '%s'", dataset_name)
+
+    result = subprocess.run(
+        ["brane", "data", "build", str(data_yml)],
+        capture_output=True, text=True,
+        cwd=str(data_dir),
+        env=_CMD_ENV,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"brane data build failed for '{dataset_name}':\n{result.stderr or result.stdout}"
+        )
+    logger.info("Dataset '%s' registered with Brane", dataset_name)
+
+
 def _stop_node(brane_node: str) -> None:
     for svc in ("reg", "job", "chk", "prx"):
         container = f"brane-{svc}-{brane_node}"

@@ -6,8 +6,10 @@ from typing import Optional
 
 import docker
 import docker.errors
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse
+from pathlib import Path as _Path
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
@@ -135,14 +137,49 @@ def nodes_status(request: Request, db: Session = Depends(get_db)):
     })
 
 
-@router.post("/datasets/register", response_class=HTMLResponse)
-def register_dataset(dataset_name: str = Form(...)):
+def _scan_datasets() -> list[dict]:
+    data_base = _Path.home() / "brane" / "data"
+    if not data_base.exists():
+        return []
+    results = []
+    for d in sorted(data_base.iterdir()):
+        if not d.is_dir():
+            continue
+        has_csv = (d / "dataset.csv").exists()
+        has_yml = (d / "data.yml").exists()
+        results.append({"name": d.name, "has_csv": has_csv, "has_yml": has_yml})
+    return results
+
+
+@router.get("/datasets", response_class=HTMLResponse)
+def datasets_page(request: Request, msg: str = "", err: str = ""):
+    return templates.TemplateResponse("admin/datasets.html", {
+        "request": request,
+        "datasets": _scan_datasets(),
+        "msg": msg,
+        "err": err,
+    })
+
+
+@router.post("/datasets/register")
+async def register_dataset(
+    dataset_name: str = Form(...),
+    file: UploadFile = File(...),
+):
     from app.application.node_provisioner.node_provisioner import _register_dataset
+    from urllib.parse import quote_plus
     try:
-        _register_dataset(dataset_name)
-        return f'<span class="text-success">Registered <strong>{dataset_name}</strong></span>'
+        file_bytes = await file.read()
+        _register_dataset(dataset_name, file_bytes)
+        return RedirectResponse(
+            f"/admin/datasets?msg={quote_plus(f'Dataset {dataset_name!r} registered successfully')}",
+            status_code=303,
+        )
     except Exception as exc:
-        return f'<span class="text-danger">Error: {exc}</span>'
+        return RedirectResponse(
+            f"/admin/datasets?err={quote_plus(str(exc)[:300])}",
+            status_code=303,
+        )
 
 
 @router.post("/nodes/{brane_node}/push-package")

@@ -34,6 +34,7 @@ from app.infrastructure.dtos import (
     ValidatePackageRequest,
     ValidatePackageResponse,
 )
+from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.llm_service import OpenAILlmService
 
 logger = logging.getLogger(__name__)
@@ -236,10 +237,11 @@ def _run_upload_bg(project_id: int, study_objective: str) -> None:
 def _provision_coordinator_bg(project_id: int) -> None:
     with Session(engine) as db:
         result = NodeProvisioner().provision_coordinator(project_id, db)
-        if result.status == "ready":
-            logger.info("Coordinator auto-provisioned for project %d: %s", project_id, result.brane_node)
-        else:
-            logger.error("Coordinator auto-provision failed for project %d: %s", project_id, result.error)
+    if result.status == "ready":
+        logger.info("Coordinator auto-provisioned for project %d: %s", project_id, result.brane_node)
+    else:
+        logger.error("Coordinator auto-provision failed for project %d: %s", project_id, result.error)
+    BraneHubService().send_coordinator_ready(project_id, result.status, result.error)
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +455,16 @@ def approve_package(
         db.add(row)
         db.commit()
         return ApprovePackageResponse(success=False, error=result.stderr)
+
+
+@router.get("/{project_id}/coordinator", status_code=200)
+def get_coordinator_status(project_id: int, db: Session = Depends(get_db)):
+    from app.domain.infra import CoordinatorNode
+    from sqlmodel import select as _select
+    coord = db.exec(_select(CoordinatorNode).where(CoordinatorNode.project_id == project_id)).first()
+    if not coord:
+        return {"status": "none"}
+    return {"status": coord.status, "brane_node": coord.brane_node}
 
 
 @router.post("/{project_id}/package/validate", status_code=200, response_model=ValidatePackageResponse)

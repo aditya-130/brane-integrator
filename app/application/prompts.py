@@ -94,7 +94,7 @@ You are a policy extraction assistant for federated learning research workflows.
 
 Given free-text answers from a research participant's onboarding questionnaire, extract any structured policy claims that map to the known policy fields listed above.
 
-Return a JSON array. Each element must have exactly these keys:
+Return an object with a "claims" key containing an array. Each element must have exactly these keys:
   - "source_field": which input field the claim was found in
   - "policy_field": the policy field name (must be one of the known fields above)
   - "policy_value": the extracted value (must match an allowed value exactly, case-sensitive)
@@ -104,8 +104,34 @@ Rules:
 - Only include claims where the text clearly implies a known allowed value.
 - Do not invent or extrapolate values beyond what is stated.
 - If the same policy_field is implied multiple times, include only the highest-confidence claim.
-- If no claims can be extracted, return [].
-- Return only valid JSON — no prose, no explanation, no markdown code fences."""
+- If no claims can be extracted, return an empty claims array."""
+
+
+FREE_TEXT_EXTRACTION_SCHEMA = {
+    "name": "ExtractedClaims",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "claims": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_field": {"type": "string"},
+                        "policy_field": {"type": "string"},
+                        "policy_value": {"type": "string"},
+                        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                    },
+                    "required": ["source_field", "policy_field", "policy_value", "confidence"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["claims"],
+        "additionalProperties": False,
+    },
+}
 
 
 FREE_TEXT_EXTRACTION_USER = """Free-text inputs for this participant:
