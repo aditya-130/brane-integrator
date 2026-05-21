@@ -268,6 +268,9 @@ Every Brane package needs exactly two functions:
    - Receives a JSON ARRAY of intermediate results via os.environ (json.loads this one)
    - Array length is variable — MUST handle any number of participants
    - Computes and prints the final answer
+   - CRITICAL DATA FLOW RULE: each element of INTERMEDIATE_RESULTS is the exact JSON object that
+     compute_local printed — including the {"output": ...} wrapper. You MUST access fields as
+     r["output"]["your_field"], NOT r["your_field"]. The "output" key is always present.
 
 --- PRIVACY RULE ---
 The local function must NEVER return raw records or identifiable data. Only return computed aggregates.
@@ -297,8 +300,10 @@ Python file (mean_age.py):
   def combine_results():
       try:
           results = json.loads(os.environ["INTERMEDIATE_RESULTS"])
-          total = sum(r["count"] for r in results)
-          weighted = sum(r["mean"] * r["count"] for r in results)
+          # CRITICAL: each element of results is the full {"output": ...} dict that compute_local printed.
+          # You MUST unwrap the "output" key: r["output"]["your_field"], NOT r["your_field"].
+          total = sum(r["output"]["count"] for r in results)
+          weighted = sum(r["output"]["mean"] * r["output"]["count"] for r in results)
           print(json.dumps({"output": {"global_mean": weighted / total, "total_count": total}}))
       except Exception as e:
           print(json.dumps({"output": None, "error": str(e)}))
@@ -311,11 +316,15 @@ container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
   name: mean_age
   version: 1.0.0
   kind: ecu
+  base: python:3.10-slim
   contributors:
     - name: Brane Integrator
   entrypoint:
     kind: task
-    exec: mean_age.py
+    exec: run.sh
+  files:
+    - mean_age.py
+    - run.sh
   actions:
     compute_local:
       command:
@@ -338,7 +347,7 @@ container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
         - name: output
           type: Any
 
-CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), contributors, entrypoint (kind: task, exec: <filename>), actions (one per function with command.args, input, output)."""
+CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), base (always "python:3.10-slim"), contributors, entrypoint (kind: task, exec: run.sh — ALWAYS run.sh, never the Python filename), actions (one per function with command.args, input, output)."""
 
 
 PACKAGE_GENERATOR_USER = """Generate a Brane package for the following federated research project.
@@ -377,6 +386,172 @@ PACKAGE_GENERATOR_SCHEMA = {
             }
         },
         "required": ["python_code", "container_yml", "design_note"],
+        "additionalProperties": False
+    }
+}
+
+
+PRIVACY_CHECK_SYSTEM = """You are a federated learning privacy reviewer. Your only job is to answer one specific question about the Python code you are given.
+
+THE QUESTION: Could the local computation function — the function that runs at each hospital or research site on their patients' data — return data at individual-patient granularity?
+
+In federated learning, only the local function's output leaves the participant site and travels to the coordinator. If that output contains individual-level patient data rather than aggregated statistics, patient privacy is violated regardless of what the coordinator does with it.
+
+WHAT COUNTS AS SAFE (the local function returns only aggregates):
+- A mean, median, count, sum, variance, or standard deviation computed across all patients
+- A histogram, frequency distribution, or binned count across value buckets
+- Model weights, gradient vectors, or parameter arrays
+- Survival curves, ROC data, or other population-level statistical structures
+- Any scalar or fixed-size vector that summarises the population as a whole
+
+WHAT COUNTS AS A CONCERN (the local function could expose individual-level data):
+- A list of patient records, rows, or dictionaries — one entry per patient
+- A list of patient identifiers (IDs, names, dates of birth, record numbers)
+- Any result whose length or number of elements depends on the number of patients
+- A filtered subset of the input dataset
+- Any output where a row in the result corresponds to a row in the input data
+
+DO NOT check anything else. Specifically, do not check or flag:
+- Whether json.loads() is called on inputs — this is correct and required by the Brane framework
+- Whether json.dumps() wraps the output — this is correct and required
+- Whether the combine function takes 2 arguments — this is the correct expected signature
+- Code style, imports, error handling, variable names, or file paths
+- The container.yml or any configuration file
+- Whether the computation correctly implements the stated study objective
+- Output format or serialisation details
+
+If you flag anything from the DO NOT CHECK list, your response is wrong.
+
+RESPONSE: Set safe to true if the local function only ever returns aggregate statistics or computed summaries. Set safe to false only if there is a genuine risk the local function could return individual-patient-level data. If safe is false, write one clear plain-language sentence in concern naming the specific risk."""
+
+
+PRIVACY_CHECK_USER = """Study objective: {study_objective}
+
+Python code:
+```python
+{python_code}
+```
+
+Does the local computation function return only population aggregates, or could it return individual-patient-level data?"""
+
+
+PRIVACY_CHECK_SCHEMA = {
+    "name": "PrivacyCheck",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "safe": {
+                "type": "boolean",
+                "description": "True if the local function returns only aggregate statistics. False if individual-patient-level data could be returned."
+            },
+            "concern": {
+                "type": "string",
+                "description": "If safe is false: one plain-language sentence describing the specific privacy risk. If safe is true: empty string."
+            }
+        },
+        "required": ["safe", "concern"],
+        "additionalProperties": False
+    }
+}
+
+
+CONTAINER_YML_SYSTEM = """You are a Brane package manifest generator. Given Python code for a federated learning computation, produce the correct container.yml that tells Brane how to package and run it.
+
+--- WHAT container.yml IS ---
+This is NOT docker-compose. NOT Kubernetes. This is a Brane-specific manifest.
+Its sole purpose is to declare: which functions are callable, what inputs each function reads from the environment, and what it outputs.
+
+--- EXACT FORMAT ---
+name: <package_name>
+version: 1.0.0
+kind: ecu
+base: python:3.10-slim
+contributors:
+  - name: Brane Integrator
+entrypoint:
+  kind: task
+  exec: run.sh
+files:
+  - <python_filename>
+  - run.sh
+actions:
+  <function_name>:
+    command:
+      args:
+        - <function_name>
+    input:
+      - name: <input_name>
+        type: <Data or Any>
+    output:
+      - name: output
+        type: Any
+
+--- STEP 1: FIND EXPOSED FUNCTIONS ---
+Look for the dispatch block at the end of the file. It is almost always one of these two forms:
+
+  Form A — dict dispatch:
+    {"fn_a": fn_a, "fn_b": fn_b}[sys.argv[1]]()
+
+  Form B — if/elif chain:
+    if sys.argv[1] == "fn_a": fn_a()
+    elif sys.argv[1] == "fn_b": fn_b()
+
+The function names in the dispatch become the action names in container.yml.
+Every dispatched function gets its own action block.
+
+--- STEP 2: FIND ENV VAR INPUTS FOR EACH FUNCTION ---
+Inside each function, find every os.environ access — these become the input declarations.
+The input name is the env var name converted to lowercase (e.g. LOCAL_DATA → local_data, INTERMEDIATE_RESULTS → intermediate_results).
+
+--- STEP 3: DETERMINE INPUT TYPE ---
+Use type "Data" when the env var value is used as a file system path:
+  - The code passes it to open(), csv.reader(), pd.read_csv(), pathlib.Path(), or any file I/O call
+  - After json.loads(), the result is opened as a file
+
+Use type "Any" when the env var value is a JSON-encoded computation result:
+  - After json.loads(), the result is iterated over, summed, averaged, or treated as a list/dict of numbers or arrays
+  - It is never passed to a file I/O function
+
+--- STEP 4: OUTPUT ---
+Every action's output is always:
+  output:
+    - name: output
+      type: Any
+
+--- RULES ---
+- Use the package name and filename exactly as given in the user prompt — do not invent alternatives
+- Do not add extra fields, comments, or metadata to the YAML
+- The entrypoint exec is ALWAYS "run.sh" — never the Python filename. run.sh is auto-created at build time.
+- If a function reads no env vars, include an empty input list: input: []
+- Preserve the exact function names from the dispatch block as action names"""
+
+
+CONTAINER_YML_USER = """Generate the container.yml for this Python package.
+
+Package name (use exactly): {package_name}
+Python filename (use exactly): {python_filename}
+
+Python code:
+```python
+{python_code}
+```
+
+Return the complete container.yml content."""
+
+
+CONTAINER_YML_SCHEMA = {
+    "name": "GeneratedContainerYml",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "container_yml": {
+                "type": "string",
+                "description": "Complete, valid Brane container.yml file content as a YAML string"
+            }
+        },
+        "required": ["container_yml"],
         "additionalProperties": False
     }
 }

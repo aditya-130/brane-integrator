@@ -52,6 +52,15 @@ class IntegratorClient:
             "decided_by": "researcher",
         })
 
+    def get_package(self, project_id: int) -> dict:
+        return self._get(f"/projects/{project_id}/package")
+
+    def validate_package(self, project_id: int, python_code: str, study_objective: str = "") -> dict:
+        return self._post(f"/projects/{project_id}/package/validate", {
+            "python_code": python_code,
+            "study_objective": study_objective,
+        })
+
     def poll_execution(
         self, project_id: int, workflow_id: str, interval: int = 5
     ) -> Iterator[dict]:

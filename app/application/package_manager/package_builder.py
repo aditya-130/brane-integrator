@@ -35,14 +35,16 @@ class PackageBuilder:
                 timeout=120,
             )
             if proc.returncode != 0:
-                logger.error("brane build failed: %s", proc.stderr)
-                return BuildResult(success=False, stderr=proc.stderr)
+                combined = f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+                logger.error("brane build failed:\n%s", combined)
+                return BuildResult(success=False, stderr=combined)
 
             # Brane CLI bug: returns exit code 0 even on Docker build failure.
             # Detect failure by checking stdout for the error marker.
             if "failed to build" in proc.stdout.lower():
-                logger.error("brane build failed (exit 0 bug): %s", proc.stdout)
-                return BuildResult(success=False, stderr=proc.stdout)
+                combined = f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+                logger.error("brane build failed (exit 0 bug):\n%s", combined)
+                return BuildResult(success=False, stderr=combined)
 
             # Extract image name from stdout (brane prints "Successfully built <name>:<version>")
             image_name = _parse_image_name(proc.stdout) or container_yml_path.parent.name

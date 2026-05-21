@@ -88,6 +88,16 @@ class RegeneratePackageResponse(BaseModel):
     design_note: str
 
 
+class ValidatePackageRequest(BaseModel):
+    python_code: str
+    study_objective: Optional[str] = None
+
+
+class ValidatePackageResponse(BaseModel):
+    safe: bool
+    concern: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Node Provisioner
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 import yaml
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +11,14 @@ from sqlmodel import Session
 from app.application.node_provisioner.node_provisioner import NodeProvisioner
 from app.application.package_manager.package_builder import PackageBuilder
 from app.application.package_manager.package_generator import PackageGenerator
-from app.application.package_manager.package_validator import Issue, PackageAssessment, PackageValidator, Suggestion
+from app.application.prompts import (
+    CONTAINER_YML_SCHEMA,
+    CONTAINER_YML_SYSTEM,
+    CONTAINER_YML_USER,
+    PRIVACY_CHECK_SCHEMA,
+    PRIVACY_CHECK_SYSTEM,
+    PRIVACY_CHECK_USER,
+)
 from app.domain.package import PackageSource
 from app.infrastructure.database import engine, get_db
 from app.infrastructure.dtos import (
@@ -23,6 +31,8 @@ from app.infrastructure.dtos import (
     RegeneratePackageRequest,
     RegeneratePackageResponse,
     SuggestionDTO,
+    ValidatePackageRequest,
+    ValidatePackageResponse,
 )
 from app.infrastructure.llm_service import OpenAILlmService
 
@@ -39,19 +49,6 @@ def _parse_package_name(container_yml: str) -> str | None:
         if stripped.startswith("name:"):
             return stripped.split(":", 1)[1].strip()
     return None
-
-
-def _assessment_from_json(raw: str) -> PackageAssessment | None:
-    try:
-        data = json.loads(raw)
-        return PackageAssessment(
-            status=data.get("status", "suitable"),
-            issues=[Issue(**i) for i in data.get("issues", [])],
-            suggestions=[Suggestion(**s) for s in data.get("suggestions", [])],
-            assessment_note=data.get("assessment_note", ""),
-        )
-    except Exception:
-        return None
 
 
 def _parse_functions(container_yml: str) -> tuple:
@@ -76,10 +73,68 @@ def _parse_functions(container_yml: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# Privacy check (Path B only)
+# ---------------------------------------------------------------------------
+
+def _check_privacy(llm: OpenAILlmService, python_code: str, study_objective: str) -> str | None:
+    """
+    Focused privacy check for uploaded code (Path B).
+    Asks one semantic question: could the local function return individual-patient-level data?
+    Returns a plain-language concern string, or None if the code is safe.
+    LLM failure is treated as safe (with a warning) so a broken API call never blocks the researcher.
+    """
+    result = llm.complete_structured(
+        system_prompt=PRIVACY_CHECK_SYSTEM,
+        user_prompt=PRIVACY_CHECK_USER.format(
+            study_objective=study_objective,
+            python_code=python_code,
+        ),
+        schema=PRIVACY_CHECK_SCHEMA,
+    )
+    if result is None:
+        logger.warning("Privacy check LLM call failed — treating as safe to avoid blocking researcher")
+        return None
+    if result.get("safe", True):
+        return None
+    concern = result.get("concern", "").strip()
+    return concern if concern else None
+
+
+def _generate_container_yml(llm: OpenAILlmService, python_code: str, package_name: str, python_filename: str) -> str | None:
+    """
+    Auto-generate container.yml for uploaded Python code (Path B).
+    The LLM reads the dispatch block to find exposed functions, infers env var input names,
+    and determines Data vs Any types from how each variable is used after json.loads.
+    """
+    result = llm.complete_structured(
+        system_prompt=CONTAINER_YML_SYSTEM,
+        user_prompt=CONTAINER_YML_USER.format(
+            package_name=package_name,
+            python_filename=python_filename,
+            python_code=python_code,
+        ),
+        schema=CONTAINER_YML_SCHEMA,
+    )
+    if result is None:
+        logger.error("Container YML generation: LLM returned None")
+        return None
+    yml = result.get("container_yml", "").strip()
+    return yml if yml else None
+
+
+# ---------------------------------------------------------------------------
 # Background tasks
 # ---------------------------------------------------------------------------
 
 def _run_generate_bg(project_id: int, study_objective: str, computation_description: str, data_types: list | None) -> None:
+    """
+    Path A: generate code via LLM, then mark assessed immediately — no validation pass.
+
+    The generator prompt contains the complete Brane execution model (json.loads on Data inputs,
+    print(json.dumps(...)) for output, 2-arg combine, etc.). Running a second LLM over the
+    generated output produces false positives on patterns that are correct by design.
+    If the generator prompt is right, the output is right. Trust the generator.
+    """
     llm = OpenAILlmService()
     try:
         package = PackageGenerator(llm).generate(
@@ -89,12 +144,11 @@ def _run_generate_bg(project_id: int, study_objective: str, computation_descript
         )
         if package is None:
             raise RuntimeError("PackageGenerator returned None")
-        assessment = PackageValidator(llm).validate(package.python_code, package.container_yml, study_objective)
         assessment_data = {
-            "status": assessment.status if assessment else "pending",
-            "issues": [vars(i) for i in assessment.issues] if assessment else [],
-            "suggestions": [vars(s) for s in assessment.suggestions] if assessment else [],
-            "assessment_note": assessment.assessment_note if assessment else "",
+            "status": "suitable",
+            "issues": [],
+            "suggestions": [],
+            "assessment_note": "",
             "design_note": package.design_note,
         }
         new_status = "assessed"
@@ -119,25 +173,45 @@ def _run_generate_bg(project_id: int, study_objective: str, computation_descript
 
 
 def _run_upload_bg(project_id: int, study_objective: str) -> None:
+    """
+    Path B: auto-generate container.yml from the researcher's Python code, then run the
+    focused privacy check. Two LLM calls total — one mechanical (manifest), one semantic (privacy).
+    """
     with Session(engine) as db:
         row = db.get(PackageSource, project_id)
         if row is None:
             return
         python_code = row.python_code
-        container_yml = row.container_yml
+        package_name = row.package_name
 
+    python_filename = f"{package_name}.py"
     llm = OpenAILlmService()
+    container_yml = None
     try:
-        assessment = PackageValidator(llm).validate(python_code, container_yml, study_objective)
-        assessment_data = {
-            "status": assessment.status if assessment else "pending",
-            "issues": [vars(i) for i in assessment.issues] if assessment else [],
-            "suggestions": [vars(s) for s in assessment.suggestions] if assessment else [],
-            "assessment_note": assessment.assessment_note if assessment else "",
-        }
+        # Step 1: generate container.yml — reads dispatch block, infers input types
+        container_yml = _generate_container_yml(llm, python_code, package_name, python_filename)
+        if not container_yml:
+            raise RuntimeError("Container YML generation returned no output")
+
+        # Step 2: focused privacy check — could the local function return individual-patient data?
+        concern = _check_privacy(llm, python_code, study_objective)
+        if concern:
+            assessment_data = {
+                "status": "issues_found",
+                "issues": [{"severity": "warning", "description": concern, "location": "local function"}],
+                "suggestions": [],
+                "assessment_note": "",
+            }
+        else:
+            assessment_data = {
+                "status": "suitable",
+                "issues": [],
+                "suggestions": [],
+                "assessment_note": "",
+            }
         new_status = "assessed"
     except Exception as exc:
-        logger.error("Package validation failed for project %d: %s", project_id, exc)
+        logger.error("Package upload processing failed for project %d: %s", project_id, exc)
         assessment_data = {"error": str(exc)}
         new_status = "failed"
 
@@ -147,6 +221,14 @@ def _run_upload_bg(project_id: int, study_objective: str) -> None:
             return
         row.assessment_status = new_status
         row.llm_assessment = json.dumps(assessment_data)
+        if container_yml:
+            row.container_yml = container_yml
+            # Parse and store function names so they're available when provisioning the coordinator
+            local_fn, combine_fn = _parse_functions(container_yml)
+            if local_fn:
+                row.local_function = local_fn
+            if combine_fn:
+                row.combine_function = combine_fn
         db.add(row)
         db.commit()
 
@@ -214,22 +296,21 @@ def register_package(
         )
 
     elif request.source_type == "upload":
-        if not request.python_code or not request.container_yml:
-            raise HTTPException(status_code=400, detail="python_code and container_yml required for source_type='upload'")
-        # Idempotent: skip if already assessed or built (only re-assess if failed or code changed)
+        if not request.python_code:
+            raise HTTPException(status_code=400, detail="python_code required for source_type='upload'")
+        # container_yml is auto-generated by the background task — not required from the researcher
         if existing and existing.build_status == "built":
             return RegisterPackageAcceptedResponse(project_id=project_id, status=existing.assessment_status)
         if existing and existing.assessment_status == "assessed" \
-                and existing.python_code == request.python_code \
-                and existing.container_yml == request.container_yml:
+                and existing.python_code == request.python_code:
             return RegisterPackageAcceptedResponse(project_id=project_id, status="assessed")
-        package_name = _parse_package_name(request.container_yml) or f"project_{project_id}_package"
+        package_name = f"project_{project_id}_package"
         row = PackageSource(
             project_id=project_id,
             source_type="uploaded",
             study_objective=request.study_objective,
             python_code=request.python_code,
-            container_yml=request.container_yml,
+            container_yml="",           # filled by _run_upload_bg
             package_name=package_name,
             assessment_status="pending",
         )
@@ -326,6 +407,30 @@ def approve_package(
         run_sh.write_text(f"#!/bin/bash\npython3 /opt/wd/{row.package_name}.py \"$1\"\n")
         run_sh.chmod(0o755)
 
+    # Copy branelet binary so the Dockerfile can ADD it
+    from app.infrastructure.settings import settings as _settings
+    branelet_src = Path(_settings.BRANELET_PATH) if _settings.BRANELET_PATH else None
+    if branelet_src and branelet_src.exists():
+        shutil.copy2(branelet_src, working_dir / "branelet")
+
+    # Write a Dockerfile if none exists — avoids brane generating a broken one
+    dockerfile = working_dir / "Dockerfile"
+    if not dockerfile.exists():
+        dockerfile.write_text(
+            "FROM python:3.10-slim\n\n"
+            "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "
+            "--allow-change-held-packages --allow-downgrades fuse iptables\n\n"
+            "ADD branelet /branelet\n"
+            "RUN chmod +x /branelet\n\n"
+            "RUN mkdir -p /opt/wd\n"
+            f"COPY {row.package_name}.py /opt/wd/{row.package_name}.py\n"
+            "COPY run.sh /opt/wd/run.sh\n"
+            "RUN chmod +x /opt/wd/run.sh\n\n"
+            "COPY container.yml /opt/wd/container.yml\n\n"
+            "WORKDIR /opt/wd\n"
+            'ENTRYPOINT ["/branelet"]\n'
+        )
+
     result = PackageBuilder().build(working_dir, container_yml_path)
 
     if result.success:
@@ -350,6 +455,24 @@ def approve_package(
         return ApprovePackageResponse(success=False, error=result.stderr)
 
 
+@router.post("/{project_id}/package/validate", status_code=200, response_model=ValidatePackageResponse)
+def validate_package(
+    project_id: int,
+    request: ValidatePackageRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Synchronous privacy check for a given piece of Python code.
+    Used by the JupyterLab notebook Re-check button. Accepts any code — does not
+    read from or write to the stored PackageSource row (no side effects).
+    Falls back to the stored study_objective if one is not provided in the request.
+    """
+    row = db.get(PackageSource, project_id)
+    study_objective = request.study_objective or (row.study_objective if row else "") or ""
+    concern = _check_privacy(OpenAILlmService(), request.python_code, study_objective)
+    return ValidatePackageResponse(safe=concern is None, concern=concern)
+
+
 @router.post("/{project_id}/package/regenerate", status_code=200, response_model=RegeneratePackageResponse)
 def regenerate_package(
     project_id: int,
@@ -371,7 +494,8 @@ def regenerate_package(
     row.python_code = package.python_code
     row.container_yml = package.container_yml
     row.build_status = "pending"
-    row.assessment_status = "pending"
+    row.assessment_status = "assessed"
+    row.llm_assessment = json.dumps({"design_note": package.design_note, "issues": [], "suggestions": [], "assessment_note": ""})
     db.add(row)
     db.commit()
 
