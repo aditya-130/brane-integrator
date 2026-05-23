@@ -89,6 +89,15 @@ class WorkflowJobHandler:
             branescript = TemplateGenerator().generate(integrator_config, interpreted)
             logger.info("[%s] TemplateGenerator done", workflow_id)
 
+        # 5.5. push package before validation so Rule 9 (GraphQL check) sees live state
+        try:
+            pkg = self.db.get(PackageSource, project_id)
+            if pkg and pkg.build_status == "built":
+                PackageBuilder().push(pkg.package_name)
+                logger.info("[%s] Pre-validation push: %s", workflow_id, pkg.package_name)
+        except Exception as exc:
+            logger.warning("[%s] Pre-validation push failed (continuing to validate): %s", workflow_id, exc)
+
         # 6. validate + generate traceability report
         validation_result = self.validator.validate(branescript, integrator_config, interpreted)
         passed = sum(1 for r in validation_result.rules if r.passed)
@@ -124,19 +133,32 @@ class WorkflowJobHandler:
         self.db.add(workflow)
         self.db.commit()
 
-        # 8. generate plain-language note for the owner review UI
-        note = self._generate_note(branescript, json.dumps(traceability_report))
+        # 8. generate plain-language note for the owner review UI (best-effort — never blocks the pipeline)
+        try:
+            note = self._generate_note(branescript, json.dumps(traceability_report))
+        except Exception as exc:
+            logger.warning("[%s] Note generation failed — continuing without note: %s", workflow_id, exc)
+            note = None
 
         # 9. upload script to BraneHub
         participants_used = [p.user_id for p in integrator_config.participants]
-        script_version = self.branehub_service.send_script_to_branehub(
-            branescript=branescript,
-            traceability_report=json.dumps(traceability_report),
-            project_id=workflow.project_id,
-            cycle_id=workflow.cycle_id,
-            participants_used=participants_used,
-            note=note,
-        )
+        try:
+            script_version = self.branehub_service.send_script_to_branehub(
+                branescript=branescript,
+                traceability_report=json.dumps(traceability_report),
+                project_id=workflow.project_id,
+                cycle_id=workflow.cycle_id,
+                participants_used=participants_used,
+                note=note,
+            )
+        except Exception as exc:
+            logger.error("[%s] Script upload to BraneHub failed: %s", workflow_id, exc)
+            workflow.status = "failed"
+            workflow.note = f"Script upload to BraneHub failed: {exc}"
+            self.db.add(workflow)
+            self.db.commit()
+            raise RuntimeError(f"Script upload to BraneHub failed: {exc}") from exc
+
         workflow.script_version = script_version
         workflow.note = note
         self.db.add(workflow)
@@ -202,7 +224,7 @@ class WorkflowJobHandler:
         )
         _running_processes[workflow_id] = proc
         try:
-            stdout, stderr = proc.communicate(timeout=120)
+            stdout, stderr = proc.communicate(timeout=settings.EXECUTION_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             proc.kill()
             stdout, stderr = proc.communicate()

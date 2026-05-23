@@ -54,6 +54,12 @@ class TemplateGenerator:
             lines.append(f"let result := {acc_var};")
         lines.append("")
 
-        lines.append("return result;")
+        if config.workflow.finalize_function:
+            lines.append(f'#[on("{config.workflow.coordinator_node}")]')
+            lines.append(f"let final_result := {config.workflow.finalize_function}(result);")
+            lines.append("")
+            lines.append("return final_result;")
+        else:
+            lines.append("return result;")
 
         return "\n".join(lines)

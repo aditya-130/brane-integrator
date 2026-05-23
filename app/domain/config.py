@@ -26,6 +26,7 @@ class WorkflowSpec(BaseModel):
     local_function: str
     combine_function: str
     coordinator_node: str
+    finalize_function: Optional[str] = None
 
 
 class ParticipantPolicy(BaseModel):

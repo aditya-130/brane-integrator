@@ -25,6 +25,8 @@ def _migrate():
         "ALTER TABLE packagesource ADD COLUMN combine_function TEXT",
         "ALTER TABLE workflow ADD COLUMN note TEXT",
         "ALTER TABLE workflow ADD COLUMN execution_result TEXT",
+        "ALTER TABLE packagesource ADD COLUMN finalize_function TEXT",
+        "ALTER TABLE projectconfig ADD COLUMN finalize_function TEXT",
     ]
     with engine.connect() as conn:
         for sql in migrations:

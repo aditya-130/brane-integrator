@@ -1,4 +1,5 @@
 import json
+import logging
 from app.domain.workflow import Workflow
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
@@ -9,6 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
 
 router = APIRouter(prefix="/projects", tags=["workflows"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/{project_id}/workflows/generate", status_code=200)
@@ -24,7 +27,7 @@ def generate_workflow(
             Workflow.cycle_id == request.cycle_id,
         )
     ).first()
-    if existing and existing.status != "pending":
+    if existing:
         return
 
     workflow = Workflow(
@@ -36,17 +39,35 @@ def generate_workflow(
     db_session.commit()
     db_session.refresh(workflow)
 
+    _workflow_id = workflow.workflow_id
+    _cycle_id = request.cycle_id
+
     def job():
         with Session(engine) as db:
-            WorkflowJobHandler(
-                db=db,
-                branehub_service=BraneHubService(),
-                llm_service=OpenAILlmService(),
-            ).handle_generation(
-                workflow.workflow_id,
-                project_id,
-                request.cycle_id,
-            )
+            try:
+                WorkflowJobHandler(
+                    db=db,
+                    branehub_service=BraneHubService(),
+                    llm_service=OpenAILlmService(),
+                ).handle_generation(
+                    _workflow_id,
+                    project_id,
+                    _cycle_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "[generate p%d c%d] generation failed: %s",
+                    project_id, _cycle_id, exc,
+                )
+                BraneHubService().send_completed(
+                    project_id=project_id,
+                    cycle_id=_cycle_id,
+                    script_version=0,
+                    status="completed_failed",
+                    result=None,
+                    error=f"Generation failed: {str(exc)[:400]}",
+                    duration_seconds=0,
+                )
 
     background_tasks.add_task(job)
     return
@@ -78,17 +99,36 @@ def reject_workflow(
     db_session.add(workflow)
     db_session.commit()
 
+    _workflow_id = workflow.workflow_id
+    _cycle_id = request.cycle_id
+    _script_version = request.script_version
+
     def job():
         with Session(engine) as db:
-            WorkflowJobHandler(
-                db=db,
-                branehub_service=BraneHubService(),
-                llm_service=OpenAILlmService(),
-            ).handle_generation(
-                workflow.workflow_id,
-                project_id,
-                request.cycle_id,
-            )
+            try:
+                WorkflowJobHandler(
+                    db=db,
+                    branehub_service=BraneHubService(),
+                    llm_service=OpenAILlmService(),
+                ).handle_generation(
+                    _workflow_id,
+                    project_id,
+                    _cycle_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    "[reject p%d c%d] regeneration failed: %s",
+                    project_id, _cycle_id, exc,
+                )
+                BraneHubService().send_completed(
+                    project_id=project_id,
+                    cycle_id=_cycle_id,
+                    script_version=_script_version,
+                    status="completed_failed",
+                    result=None,
+                    error=f"Regeneration failed: {str(exc)[:400]}",
+                    duration_seconds=0,
+                )
 
     background_tasks.add_task(job)
     return

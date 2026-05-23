@@ -72,6 +72,7 @@ class ConfigParser:
             local_function=project_config.local_function,
             combine_function=project_config.combine_function,
             coordinator_node=project_config.coordinator_node,
+            finalize_function=project_config.finalize_function,
         )
 
     def _build_participant_policies(self, raw: dict) -> list[ParticipantPolicy]:

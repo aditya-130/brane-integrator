@@ -57,11 +57,16 @@ class ProvisionResult:
 # ── Private helpers ────────────────────────────────────────────────────────────
 
 def _check_node_running(brane_node: str) -> bool:
-    result = subprocess.run(
-        ["docker", "inspect", "--format", "{{.State.Running}}", f"brane-job-{brane_node}"],
-        capture_output=True, text=True, env=_CMD_ENV,
-    )
-    return result.stdout.strip() == "true"
+    # All four services must be running — chk/prx can exit 127 on WSL2 bind-mount staleness
+    # while brane-job stays up, so checking only brane-job misses a partially-down node.
+    for svc in ("reg", "job", "chk", "prx"):
+        result = subprocess.run(
+            ["docker", "inspect", "--format", "{{.State.Running}}", f"brane-{svc}-{brane_node}"],
+            capture_output=True, text=True, env=_CMD_ENV,
+        )
+        if result.stdout.strip() != "true":
+            return False
+    return True
 
 
 def _find_active_node_for_user(user_id: int, db: Session) -> Optional[ProvisionedNode]:
@@ -244,6 +249,61 @@ def _extend_brane_fwd(brane_node: str, ports: PortBlock) -> None:
             capture_output=True, env=_CMD_ENV,
         )
     logger.info("Extended brane-fwd with socat rules for %s", brane_node)
+
+
+def _get_chk_ports_from_container(brane_node: str) -> tuple[int, int]:
+    """Inspect brane-chk-{brane_node} to find its exposed ports (delib, store)."""
+    result = subprocess.run(
+        ["docker", "inspect", f"brane-chk-{brane_node}", "--format", "{{json .HostConfig.PortBindings}}"],
+        capture_output=True, text=True, env=_CMD_ENV,
+    )
+    import json as _json
+    bindings = _json.loads(result.stdout.strip() or "{}")
+    ports = sorted(int(k.split("/")[0]) for k in bindings if bindings[k])
+    if len(ports) >= 2:
+        return ports[0], ports[1]
+    if len(ports) == 1:
+        return ports[0], ports[0] + 1
+    return 0, 0
+
+
+def _extend_brane_fwd_static() -> None:
+    """
+    Ensure static (pre-existing) nodes listed in infra.yml but NOT provisioned by the
+    Integrator are accessible via brane-fwd. Called from reconcile so rules survive
+    brane-fwd restarts. Reads reg/job ports from infra.yml; chk ports from container bindings.
+    """
+    # Nodes managed by the NodeProvisioner start with "participant-" or "coordinator-"
+    # Anything else in infra.yml is a static node that needs manual socat wiring.
+    try:
+        with open(_CENTRAL_INFRA_YML) as f:
+            infra = yaml.safe_load(f) or {}
+    except Exception as exc:
+        logger.warning("_extend_brane_fwd_static: could not read infra.yml: %s", exc)
+        return
+
+    managed_prefixes = ("participant-", "coordinator-")
+    for location_name, loc in infra.get("locations", {}).items():
+        if any(location_name.startswith(p) for p in managed_prefixes):
+            continue  # handled by the normal dynamic provisioning path
+        try:
+            # Parse port from "host.docker.internal:PORT"
+            reg_port = int(loc.get("registry", ":0").split(":")[-1])
+            job_port = int(loc.get("delegate", ":0").split(":")[-1])
+            chk_delib, chk_store = _get_chk_ports_from_container(location_name)
+            if not reg_port or not job_port:
+                logger.debug("_extend_brane_fwd_static: no ports found for %s — skipping", location_name)
+                continue
+            ports = PortBlock(
+                reg=reg_port,
+                job=job_port,
+                chk_deliberation=chk_delib,
+                chk_store=chk_store,
+                prx=0,
+            )
+            _extend_brane_fwd(location_name, ports)
+        except Exception as exc:
+            logger.warning("_extend_brane_fwd_static: failed for %s: %s", location_name, exc)
 
 
 def _remove_from_infra_yml(brane_node: str) -> None:
@@ -545,6 +605,7 @@ class NodeProvisioner:
                         package=src.package_name,
                         local_function=src.local_function,
                         combine_function=src.combine_function,
+                        finalize_function=src.finalize_function,
                     ))
 
             db.commit()
@@ -609,6 +670,14 @@ class NodeProvisioner:
                 _extend_brane_fwd(brane_node, ports)
             except Exception as exc:
                 logger.warning("Reconcile: brane-fwd extend failed for %s: %s", brane_node, exc)
+
+        # Also ensure static nodes (worker1, worker2, alice, bob, etc.) are reachable.
+        # These are registered in infra.yml but not provisioned by the Integrator.
+        # Their socat rules are wiped on every brane-fwd restart and must be re-added.
+        try:
+            _extend_brane_fwd_static()
+        except Exception as exc:
+            logger.warning("Reconcile: static node brane-fwd extension failed: %s", exc)
 
     def _push_package(self, project_id: int, db: Session) -> None:
         src = db.exec(

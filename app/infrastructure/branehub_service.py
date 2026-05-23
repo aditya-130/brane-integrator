@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 import httpx
@@ -103,17 +104,21 @@ class BraneHubService:
         }
         if result is not None:
             body["result"] = result
-        response = httpx.post(
-            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/completed",
-            headers={
-                "X-API-Key": settings.BRANE_INTEGRATOR_API_KEY,
-                "Content-Type": "application/json",
-            },
-            json=body,
-            timeout=10,
-        )
-        if not response.is_success:
-            logger.warning("BraneHub returned %s on send_completed: %s", response.status_code, response.text)
+        url = f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}/completed"
+        headers = {"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY, "Content-Type": "application/json"}
+        for attempt in range(1, 4):
+            try:
+                response = httpx.post(url, headers=headers, json=body, timeout=10)
+                if response.is_success:
+                    return
+                logger.warning(
+                    "send_completed attempt %d/3: BraneHub returned %s — %s",
+                    attempt, response.status_code, response.text[:120],
+                )
+            except Exception as exc:
+                logger.warning("send_completed attempt %d/3: request failed — %s", attempt, exc)
+            if attempt < 3:
+                time.sleep(5 * attempt)
 
     def send_coordinator_ready(self, project_id: int, status: str, error: str | None = None) -> None:
         if not settings.BRANEHUB_BASE_URL:

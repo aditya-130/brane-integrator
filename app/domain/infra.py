@@ -16,6 +16,7 @@ class ProjectConfig(SQLModel, table=True):
     package: str
     local_function: str
     combine_function: str
+    finalize_function: Optional[str] = None
 
 
 class ProvisionedNode(SQLModel, table=True):

@@ -53,24 +53,31 @@ def _parse_package_name(container_yml: str) -> str | None:
 
 
 def _parse_functions(container_yml: str) -> tuple:
-    """Extract (local_function, combine_function) from container.yml actions section."""
+    """Extract (local_function, combine_function, finalize_function) from container.yml actions."""
     try:
         data = yaml.safe_load(container_yml)
         actions = data.get("actions", {})
         if not actions:
-            return None, None
-        names = list(actions.keys())
-        local, combine = None, None
+            return None, None, None
+        local, combine, finalize = None, None, None
         for name, spec in actions.items():
             inputs = spec.get("input", []) or []
-            has_data_input = any(i.get("type") in ("Data", "IntermediateResult") for i in inputs)
-            if has_data_input and local is None:
-                local = name
-            elif combine is None:
-                combine = name
-        return local or names[0], combine or (names[1] if len(names) > 1 else None)
+            has_data = any(i.get("type") in ("Data", "IntermediateResult") for i in inputs)
+            string_inputs = [i for i in inputs if i.get("type") == "string"]
+            if has_data and local is None:
+                local = name                          # Data input → local function
+            elif len(string_inputs) == 2 and combine is None:
+                combine = name                        # 2 string inputs → combine
+            elif len(string_inputs) == 1 and not has_data and finalize is None:
+                finalize = name                       # 1 string input, no Data → finalize
+        names = list(actions.keys())
+        return (
+            local or names[0],
+            combine or (names[1] if len(names) > 1 else None),
+            finalize,
+        )
     except Exception:
-        return None, None
+        return None, None, None
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +176,9 @@ def _run_generate_bg(project_id: int, study_objective: str, computation_descript
             row.python_code = package.python_code
             row.container_yml = package.container_yml
             row.package_name = package.package_name
+            row.local_function = package.local_function
+            row.combine_function = package.combine_function
+            row.finalize_function = package.finalize_function
         db.add(row)
         db.commit()
 
@@ -225,11 +235,13 @@ def _run_upload_bg(project_id: int, study_objective: str) -> None:
         if container_yml:
             row.container_yml = container_yml
             # Parse and store function names so they're available when provisioning the coordinator
-            local_fn, combine_fn = _parse_functions(container_yml)
+            local_fn, combine_fn, finalize_fn = _parse_functions(container_yml)
             if local_fn:
                 row.local_function = local_fn
             if combine_fn:
                 row.combine_function = combine_fn
+            if finalize_fn:
+                row.finalize_function = finalize_fn
         db.add(row)
         db.commit()
 
@@ -441,11 +453,13 @@ def approve_package(
         row.working_dir = str(working_dir)
         row.built_at = datetime.now(timezone.utc)
         row.approved_at = datetime.now(timezone.utc)
-        local_fn, combine_fn = _parse_functions(row.container_yml)
+        local_fn, combine_fn, finalize_fn = _parse_functions(row.container_yml)
         if local_fn:
             row.local_function = local_fn
         if combine_fn:
             row.combine_function = combine_fn
+        if finalize_fn:
+            row.finalize_function = finalize_fn
         db.add(row)
         db.commit()
         background_tasks.add_task(_provision_coordinator_bg, project_id)

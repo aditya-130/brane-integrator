@@ -20,4 +20,5 @@ class PackageSource(SQLModel, table=True):
     working_dir: Optional[str] = None
     local_function: Optional[str] = None
     combine_function: Optional[str] = None
+    finalize_function: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

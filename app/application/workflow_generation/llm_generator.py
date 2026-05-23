@@ -73,10 +73,13 @@ class LlmGenerator:
 
         container_yml_block = f"\nPackage container.yml (use this to understand exact function signatures and argument counts):\n```yaml\n{container_yml}\n```\n" if container_yml else ""
 
+        finalize_line = f"\nFinalize function (call once on coordinator after all combines): {config.workflow.finalize_function}" if config.workflow.finalize_function else ""
+
         return LLM_GENERATOR_USER.format(
             package=config.workflow.package,
             local_function=config.workflow.local_function,
             combine_function=config.workflow.combine_function,
+            finalize_function_line=finalize_line,
             coordinator_node=config.workflow.coordinator_node,
             participants_block=participants_block,
             wf_tags_block=wf_tags_block,

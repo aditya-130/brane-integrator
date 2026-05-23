@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     BRANELET_PATH: str = ""  # path to local branelet binary; if set, passed as --init to brane package build
     BRANE_API_CONTAINER: str = "brane-api"  # Docker container name for brane-api
     BRANE_CENTRAL_PACKAGES_PATH: str = "/home/aditya/brane/nodes/central/packages"  # host path to central packages dir (used to fix bind-mount ownership before push)
+    EXECUTION_TIMEOUT_SECONDS: int = 600
 
     model_config = {"env_file": ".env"}
 

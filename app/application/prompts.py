@@ -224,23 +224,97 @@ let result := combine_fn(acc_0, stats_3);
 
 return result;
 
+--- CHOOSING THE RIGHT PATTERN ---
+Read the container_yml block carefully — it lists every function the package exposes and
+what inputs each accepts. Use this to determine the correct pattern:
+
+SINGLE-PASS MAP-REDUCE (default)
+  Use when the package has one local function and one combine/aggregate function.
+  Each site runs the local function once on its data. The coordinator merges all results.
+  Suitable for: mean/count/histogram, single-model fit, correlation, any one-shot aggregate.
+
+MULTI-ROUND ITERATIVE
+  Use when the package exposes additional functions — for example, one that accepts both
+  local data AND a prior round's global output as inputs. This means the study requires
+  multiple passes: local → aggregate → feed global back → local again → aggregate.
+  Suitable for: federated averaging, iterative optimisation, multi-round model training.
+
+If the package only exposes the two functions named in the prompt, always use single-pass.
+Only use multi-round when container_yml shows functions that accept a prior-round input.
+
+
+--- MULTI-ROUND ITERATIVE EXAMPLE (2 rounds, 2 participants) ---
+In this pattern each round's coordinator output feeds the next round's local step.
+Every #[on()] is required before EACH local call and EACH combine call.
+Variable names must be unique per round to avoid shadowing.
+
+import mypackage;
+
+#![wf_tag("sensitivity.High")]
+
+let data_1 := new Data { name := "site1-data" };
+let data_2 := new Data { name := "site2-data" };
+
+# --- Round 1: local computation ---
+#[on("site1")]
+let r1_local_1 := local_fn(data_1);
+
+#[on("site2")]
+let r1_local_2 := local_fn(data_2);
+
+# --- Round 1: aggregate at coordinator ---
+#[on("coordinator")]
+let global_r1 := combine_fn(r1_local_1, r1_local_2);
+
+# --- Round 2: local computation using round-1 global output ---
+#[on("site1")]
+let r2_local_1 := local_fn_with_prior(data_1, global_r1);
+
+#[on("site2")]
+let r2_local_2 := local_fn_with_prior(data_2, global_r1);
+
+# --- Round 2: final aggregation ---
+#[on("coordinator")]
+let result := combine_fn(r2_local_1, r2_local_2);
+
+return result;
+
+Rules specific to multi-round:
+- The combine function STILL takes exactly 2 arguments — left-fold for N>2 participants.
+- Each #[on("coordinator")] annotation covers only the immediately following statement.
+- Use distinct variable names per round (r1_local_1, r2_local_1 etc.) — never reuse.
+- Adapt the number of rounds and function names to what container_yml actually exposes.
+- Do NOT generate multi-round if the package only has a single local + single combine function.
+
+
 --- GENERATION RULES ---
 1. Start with: import <package>;
 2. Place all #![wf_tag()] lines immediately after import, one per line, NO semicolons.
 3. Declare all datasets: let data_N := new Data { name := "dataset-name" };
 4. For each participant: one #[on()] line, then one #[tag()] per tag, each on its own line, then the let statement.
 5. For the combine step: #[on("coordinator")] on its own line, then the combine let statement.
-6. End with: return <result>;
-7. Return ONLY the BraneScript. No markdown, no comments, no explanation."""
+6. For multi-round: repeat steps 4–5 per round, feeding coordinator output into the next round's local call.
+7. End with: return <result>;
+8. Return ONLY the BraneScript. No markdown, no comments, no explanation."""
 
 
 LLM_GENERATOR_USER = """Generate a complete BraneScript workflow for the following federated project.
 
 Package: {package}
-Local function (runs at each participant): {local_function}
-Combine function (runs at coordinator): {combine_function}
+Default local function (runs at each participant): {local_function}
+Combine/aggregate function (runs at coordinator): {combine_function}{finalize_function_line}
 Coordinator node: {coordinator_node}
 {container_yml_block}
+IMPORTANT: Read the container.yml above carefully. If it exposes additional functions
+beyond the two defaults (e.g. a function that takes both local data and a prior-round
+global output), you MUST use the MULTI-ROUND ITERATIVE pattern described in the system
+prompt. Do not default to single-pass map-reduce if the package supports more rounds.
+
+If a finalize function is listed above, you MUST call it on the coordinator AFTER all
+combine calls are complete, passing the combined result as its single argument. The
+finalize function produces the final workflow output — return its result, not the
+combine accumulator.
+
 Participants:
 {participants_block}
 
@@ -281,28 +355,59 @@ IMPORTANT — Data inputs: When a function receives a Brane Data type, Brane JSO
 Non-Data inputs (numbers, strings, arrays) also arrive as JSON-encoded strings:
   value = json.loads(os.environ["MY_INPUT"])
 
---- THE TWO FUNCTIONS YOU MUST GENERATE ---
-Every Brane package needs exactly two functions:
+--- THE THREE FUNCTIONS YOU MUST GENERATE ---
+Every Brane package needs exactly three functions:
 
 1. local_function — runs at each participant site on their local data.
-   - Reads the local data file path from os.environ (Data type — plain string, not JSON)
+   - Reads the local data file path from os.environ (Data type — must json.loads)
    - Opens and reads the file directly
    - Computes an intermediate aggregate (never returns raw records)
-   - Prints result as JSON
+   - CRITICAL: output the result as a JSON-encoded STRING — json.dumps the dict TWICE:
+       result = {"count": n, "sum": s}
+       print(json.dumps({"output": json.dumps(result)}))   # inner json.dumps makes it a String
 
 2. combine_function — runs at the central coordinator.
-   - Receives a JSON ARRAY of intermediate results via os.environ (json.loads this one)
-   - Array length is variable — MUST handle any number of participants
-   - Computes and prints the final answer
-   - CRITICAL DATA FLOW RULE: each element of INTERMEDIATE_RESULTS is the exact JSON object that
-     compute_local printed — including the {"output": ...} wrapper. You MUST access fields as
-     r["output"]["your_field"], NOT r["your_field"]. The "output" key is always present.
+   - Receives exactly TWO intermediate results via os.environ: RESULT_1 and RESULT_2
+   - CRITICAL INPUT DECODING: inputs arrive as String type — you MUST double-decode:
+       result_1 = json.loads(json.loads(os.environ["RESULT_1"]))   # double json.loads required
+       result_2 = json.loads(json.loads(os.environ["RESULT_2"]))   # same for RESULT_2
+   - CRITICAL DESIGN RULE — the combine function MUST be an accumulator, not a finalizer:
+     its output must have the SAME structure as its inputs (the compute_local output).
+     Example: if compute_local outputs {"count": N, "sum": S}, combine_results must also
+     output {"count": N1+N2, "sum": S1+S2} — NOT a final average. This is required so that
+     BraneScript left-fold chains work correctly for any number of participants:
+       let acc := combine(local_1, local_2);   # acc has same shape as local_1/local_2
+       let result := combine(acc, local_3);    # works because acc shape == local shape
+     If combine computes a final answer (e.g. divides sum by count to get mean), the second
+     fold call receives the wrong shape and crashes.
+   - Output the combined result the SAME way as local_function — double-encode:
+       combined = {"count": total, "sum": total_sum}
+       print(json.dumps({"output": json.dumps(combined)}))
+
+3. finalize_function — runs ONCE on the coordinator AFTER all combines are complete.
+   - Receives the final accumulated result via os.environ: ACCUMULATOR
+   - CRITICAL INPUT DECODING: double-decode just like combine inputs:
+       accumulated = json.loads(json.loads(os.environ["ACCUMULATOR"]))
+   - Converts the accumulator into the final human-readable answer.
+     Example: if accumulator is {"count": N, "sum": S}, finalize computes the mean:
+       result = {"mean": accumulated["sum"] / accumulated["count"]}
+       print(json.dumps({"output": json.dumps(result)}))
+   - This is the ONLY place division, normalisation, or post-processing should happen.
+   - Output the final answer as a double-encoded string (same pattern as above).
+
+--- WHY DOUBLE JSON-ENCODING ---
+Brane's type system requires type: string (lowercase) for complex structured values. The env var
+arrives as a JSON-encoded string (one json.loads gives the string, a second gives the dict).
+CRITICAL: always use type: string (lowercase) in container.yml. Never use type: Any (causes
+Class<Any> runtime crash). Never use type: String (capital S — Brane parses this as a class
+type Class<String>, which causes a type mismatch error at runtime).
 
 --- PRIVACY RULE ---
 The local function must NEVER return raw records or identifiable data. Only return computed aggregates.
 
 --- ERROR HANDLING ---
-Wrap each function body in try/except. On error: print(json.dumps({"output": None, "error": str(e)}))
+Wrap each function body in try/except. On error:
+  print(json.dumps({"output": json.dumps({"error": str(e)})}))
 
 --- COMPLETE WORKING EXAMPLE ---
 Study: compute mean age across sites from CSV files.
@@ -312,31 +417,45 @@ Python file (mean_age.py):
 
   def compute_local():
       try:
-          path = json.loads(os.environ["LOCAL_DATA"])   # Data type: MUST json.loads — Brane JSON-encodes the path
+          path = json.loads(os.environ["LOCAL_DATA"])   # Data type: MUST json.loads
           ages = []
           with open(path, newline="") as f:
               reader = csv.DictReader(f)
               for row in reader:
                   ages.append(float(row["age"]))
-          result = {"mean": sum(ages) / len(ages), "count": len(ages)}
-          print(json.dumps({"output": result}))
+          result = {"sum": sum(ages), "count": len(ages)}
+          # Double-encode: inner json.dumps makes a String, outer wraps in {"output": ...}
+          print(json.dumps({"output": json.dumps(result)}))
       except Exception as e:
-          print(json.dumps({"output": None, "error": str(e)}))
+          print(json.dumps({"output": json.dumps({"error": str(e)})}))
 
   def combine_results():
       try:
-          results = json.loads(os.environ["INTERMEDIATE_RESULTS"])
-          # CRITICAL: each element of results is the full {"output": ...} dict that compute_local printed.
-          # You MUST unwrap the "output" key: r["output"]["your_field"], NOT r["your_field"].
-          total = sum(r["output"]["count"] for r in results)
-          weighted = sum(r["output"]["mean"] * r["output"]["count"] for r in results)
-          print(json.dumps({"output": {"global_mean": weighted / total, "total_count": total}}))
+          # Double-decode: env var is JSON-encoded String; first loads → string, second → dict
+          result_1 = json.loads(json.loads(os.environ["RESULT_1"]))
+          result_2 = json.loads(json.loads(os.environ["RESULT_2"]))
+          # ACCUMULATOR PATTERN: output same structure as compute_local so left-fold works for N>2.
+          # Do NOT compute a final average here — accumulate partial sums only.
+          combined = {"sum": result_1["sum"] + result_2["sum"],
+                      "count": result_1["count"] + result_2["count"]}
+          print(json.dumps({"output": json.dumps(combined)}))
       except Exception as e:
-          print(json.dumps({"output": None, "error": str(e)}))
+          print(json.dumps({"output": json.dumps({"error": str(e)})}))
+
+  def finalize():
+      try:
+          # Double-decode the accumulated result
+          accumulated = json.loads(json.loads(os.environ["ACCUMULATOR"]))
+          # Compute the final answer from the accumulator
+          mean_age = accumulated["sum"] / accumulated["count"] if accumulated["count"] else 0
+          result = {"mean_age": round(mean_age, 2)}
+          print(json.dumps({"output": json.dumps(result)}))
+      except Exception as e:
+          print(json.dumps({"output": json.dumps({"error": str(e)})}))
 
   if __name__ == "__main__":
       import sys
-      {"compute_local": compute_local, "combine_results": combine_results}[sys.argv[1]]()
+      {"compute_local": compute_local, "combine_results": combine_results, "finalize": finalize}[sys.argv[1]]()
 
 container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
   name: mean_age
@@ -361,19 +480,33 @@ container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
           type: Data
       output:
         - name: output
-          type: Any
+          type: string
     combine_results:
       command:
         args:
           - combine_results
       input:
-        - name: intermediate_results
-          type: Any
+        - name: result_1
+          type: string
+        - name: result_2
+          type: string
       output:
         - name: output
-          type: Any
+          type: string
+    finalize:
+      command:
+        args:
+          - finalize
+      input:
+        - name: accumulator
+          type: string
+      output:
+        - name: output
+          type: string
 
-CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), base (always "python:3.10-slim"), contributors, entrypoint (kind: task, exec: run.sh — ALWAYS run.sh, never the Python filename), actions (one per function with command.args, input, output)."""
+CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), base (always "python:3.10-slim"), contributors, entrypoint (kind: task, exec: run.sh — ALWAYS run.sh, never the Python filename), actions (one per function with command.args, input, output).
+CRITICAL: ALWAYS use type: string for complex/structured outputs and inputs. NEVER use type: Any — Brane cannot parse Class<Any> return values from ECU packages.
+CRITICAL: You MUST generate all THREE functions (local_function, combine_function, finalize_function) and include all THREE as actions in container.yml."""
 
 
 PACKAGE_GENERATOR_USER = """Generate a Brane package for the following federated research project.
@@ -388,6 +521,7 @@ Use these exact names:
   Package name: {package_name}
   Local function name: {local_function}
   Combine function name: {combine_function}
+  Finalize function name: {finalize_function}
   Python filename: {python_filename}"""
 
 
@@ -508,10 +642,10 @@ actions:
         - <function_name>
     input:
       - name: <input_name>
-        type: <Data or Any>
+        type: <Data or String>
     output:
       - name: output
-        type: Any
+        type: string
 
 --- STEP 1: FIND EXPOSED FUNCTIONS ---
 Look for the dispatch block at the end of the file. It is almost always one of these two forms:
@@ -528,22 +662,28 @@ Every dispatched function gets its own action block.
 
 --- STEP 2: FIND ENV VAR INPUTS FOR EACH FUNCTION ---
 Inside each function, find every os.environ access — these become the input declarations.
-The input name is the env var name converted to lowercase (e.g. LOCAL_DATA → local_data, INTERMEDIATE_RESULTS → intermediate_results).
+The input name is the env var name converted to lowercase (e.g. LOCAL_DATA → local_data, RESULT_1 → result_1, RESULT_2 → result_2).
+IMPORTANT: the combine function always reads from RESULT_1 and RESULT_2 — never from INTERMEDIATE_RESULTS. It must declare exactly two inputs: result_1 (String) and result_2 (String).
+IMPORTANT: the combine function must be an accumulator — its output structure must match its inputs (same fields as compute_local output). This makes BraneScript left-fold chains correct for any number of participants.
 
 --- STEP 3: DETERMINE INPUT TYPE ---
 Use type "Data" when the env var value is used as a file system path:
   - The code passes it to open(), csv.reader(), pd.read_csv(), pathlib.Path(), or any file I/O call
   - After json.loads(), the result is opened as a file
 
-Use type "Any" when the env var value is a JSON-encoded computation result:
-  - After json.loads(), the result is iterated over, summed, averaged, or treated as a list/dict of numbers or arrays
+Use type "String" when the env var value is a JSON-encoded computation result:
+  - After json.loads() and a SECOND json.loads(), the result is iterated over, summed, averaged, or treated as a list/dict of numbers or arrays
+  - The code uses double json.loads: json.loads(json.loads(os.environ["VAR"]))
   - It is never passed to a file I/O function
 
 --- STEP 4: OUTPUT ---
 Every action's output is always:
   output:
     - name: output
-      type: Any
+      type: string
+
+IMPORTANT: ALWAYS use type: string for complex/structured outputs. NEVER use type: Any.
+Brane's branelet cannot parse Class<Any> return values from ECU packages.
 
 --- RULES ---
 - Use the package name and filename exactly as given in the user prompt — do not invent alternatives
@@ -590,18 +730,25 @@ Output must be printed to stdout as: print(json.dumps({"output": ...})). The con
 
 INPUT HANDLING — this is critical, get it right:
 - "Data" type inputs: Brane JSON-encodes the file path before passing it as an env var. A dataset named "my-data" arrives as the JSON string "/data/my-data" (with surrounding quotes). You MUST read it with json.loads(os.environ["VAR"]) to get the plain path. Using os.environ["VAR"] directly (without json.loads) will give you a quoted string and cause FileNotFoundError. json.loads() on a Data env var is CORRECT and REQUIRED.
-- "string" / "integer" / "real" type inputs: arrive as JSON-encoded values. Read with json.loads(os.environ["VAR"]) — this IS correct and expected.
+- "String" type inputs (compute results passed between functions): arrive as a double-encoded JSON string. You MUST use json.loads(json.loads(os.environ["VAR"])) — two calls. This double json.loads is CORRECT and REQUIRED. Do NOT flag it.
 
 OUTPUT HANDLING:
-- When a function's output type in container.yml is "string", the value stored in "output" must itself be a JSON-encoded string. This means you MUST double-encode: print(json.dumps({"output": json.dumps(result)})) — the inner json.dumps(result) converts the result dict to a string, and the outer json.dumps wraps the Brane envelope. This double json.dumps is CORRECT and REQUIRED for string output types. Do NOT flag it as an issue.
-- When a function's output type is "Any" or an object/struct, use: print(json.dumps({"output": result})).
+- All complex/structured outputs MUST use type: string (lowercase) in container.yml.
+  Using type: Any is a CRITICAL error — Brane cannot parse Class<Any> return values.
+  Using type: String (capital S) is ALSO a CRITICAL error — Brane parses it as the class
+  type Class<String>, causing a runtime type mismatch ("expected Class<String>, got String").
+  Only lowercase type: string maps to Brane's primitive String type correctly.
+- For string output type: double-encode: print(json.dumps({"output": json.dumps(result)}))
+  The inner json.dumps(result) converts the result dict to a string, outer wraps the Brane envelope.
+  This double json.dumps is CORRECT and REQUIRED. Do NOT flag it as an issue.
 - The entrypoint exec field references a shell script (e.g. run.sh) that is auto-generated at build time — do NOT flag a missing run.sh as an issue.
 
 --- WHAT TO CHECK ---
 1. Brane compatibility
-   - For Data inputs: does the function read os.environ["VAR"] as a plain path? (NOT json.loads)
-   - For IntermediateResult or string inputs: does the function use json.loads(os.environ["VAR"])? This is correct.
-   - Does each function output via print(json.dumps({"output": ...}))? For string output type, double json.dumps is correct.
+   - For Data inputs: does the function use json.loads(os.environ["VAR"])? This is CORRECT.
+   - For String inputs (computation results): does the function use json.loads(json.loads(os.environ["VAR"]))? Double-decode is CORRECT and REQUIRED.
+   - Does each function output via print(json.dumps({"output": json.dumps(result)}))? Double-encode is CORRECT for String type.
+   - Does container.yml use type: string (lowercase) for all structured inputs/outputs? Using type: Any OR type: String (capital S) is a CRITICAL error — both cause runtime type mismatches in Brane.
    - Is the container.yml in Brane format (name/version/kind/entrypoint/actions) — NOT docker-compose format?
    - Does container.yml declare all functions as actions with input/output types?
 

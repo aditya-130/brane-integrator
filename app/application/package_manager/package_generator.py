@@ -18,6 +18,7 @@ class GeneratedPackage:
     python_filename: str
     local_function: str
     combine_function: str
+    finalize_function: str
     python_code: str
     container_yml: str
     design_note: str
@@ -44,6 +45,7 @@ class PackageGenerator:
         package_name = package_name or _slugify(study_objective)
         local_function = "compute_local"
         combine_function = "combine_results"
+        finalize_function = "finalize"
         python_filename = f"{package_name}.py"
 
         user_prompt = PACKAGE_GENERATOR_USER.format(
@@ -53,6 +55,7 @@ class PackageGenerator:
             package_name=package_name,
             local_function=local_function,
             combine_function=combine_function,
+            finalize_function=finalize_function,
             python_filename=python_filename,
         )
 
@@ -71,6 +74,7 @@ class PackageGenerator:
             python_filename=python_filename,
             local_function=local_function,
             combine_function=combine_function,
+            finalize_function=finalize_function,
             python_code=result["python_code"],
             container_yml=result["container_yml"],
             design_note=result["design_note"],

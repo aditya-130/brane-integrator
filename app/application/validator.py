@@ -68,27 +68,43 @@ class Validator:
                 message=None if present else f"Missing: {p.on_annotation} for {p.brane_node}",
             ))
 
-        # Rule 4: if a combine function appears in the script, it must be pinned to coordinator
+        # Rule 4: EVERY combine call must be immediately preceded by #[on(coordinator)].
+        # The original implementation broke on the first pinned call, missing un-annotated
+        # calls later in a left-fold chain (e.g. call #2 or #3 for N>2 participants).
+        # Fixed: scan all call sites; reset the annotation flag after each combine call
+        # is consumed so that the next call must carry its own annotation.
         combine_fn = config.workflow.combine_function
         if combine_fn not in branescript:
             rules.append(RuleResult(rule="combine_pinned_to_coordinator", passed=True, message="N/A — no combine step in this workflow"))
         else:
             coordinator_on = f'#[on("{config.workflow.coordinator_node}")]'
-            found = False
+            all_pinned = True
+            missing_call = None
+            missing_line = None
+            call_number = 0
             prev_was_coordinator = False
-            for line in lines:
+            for i, line in enumerate(lines, start=1):
                 stripped = line.strip()
                 if stripped == coordinator_on:
                     prev_was_coordinator = True
                 elif stripped.startswith("#[on("):
                     prev_was_coordinator = False
-                if combine_fn in stripped and prev_was_coordinator:
-                    found = True
-                    break
+                if combine_fn in stripped and "(" in stripped:
+                    call_number += 1
+                    if not prev_was_coordinator:
+                        all_pinned = False
+                        missing_call = call_number
+                        missing_line = i
+                        break
+                    prev_was_coordinator = False  # annotation is consumed by this statement
             rules.append(RuleResult(
                 rule="combine_pinned_to_coordinator",
-                passed=found,
-                message=None if found else f"Combine step not pinned to coordinator '{config.workflow.coordinator_node}'",
+                passed=all_pinned,
+                message=None if all_pinned else (
+                    f"Combine call #{missing_call} at line {missing_line} is not pinned to coordinator "
+                    f"'{config.workflow.coordinator_node}' — add "
+                    f'#[on("{config.workflow.coordinator_node}")] immediately before it'
+                ),
             ))
 
         # Rule 5: wf_tags present in .bs
@@ -137,14 +153,14 @@ class Validator:
         # Rule 9: verify package and functions are registered in the Brane API
         # brane workflow check is broken in nightly (constructs URLs without http:// scheme),
         # so we query the GraphQL API directly instead.
-        rules.extend(self._check_package_registered(config))
+        rules.extend(self._check_package_registered(config, branescript))
 
         return ValidationResult(
             passed=all(r.passed for r in rules),
             rules=rules,
         )
 
-    def _check_package_registered(self, config: IntegratorConfig) -> List[RuleResult]:
+    def _check_package_registered(self, config: IntegratorConfig, branescript: str = "") -> List[RuleResult]:
         query = '{ packages { name functionsAsJson } }'
         api_url = f"http://{settings.BRANE_API_URL}/graphql"
         try:
@@ -168,6 +184,8 @@ class Validator:
         results.append(RuleResult(rule="package_registered", passed=True, message=None))
 
         functions = pkg_map[package]
+
+        # Check the two configured function names (local + combine)
         for fn_field, fn_name in [("local_function", config.workflow.local_function), ("combine_function", config.workflow.combine_function)]:
             if fn_name in functions:
                 logger.info("Validator: function '%s' found in package '%s'", fn_name, package)
@@ -175,6 +193,41 @@ class Validator:
             else:
                 logger.warning("Validator: function '%s' NOT found in package '%s'", fn_name, package)
                 results.append(RuleResult(rule=f"function_registered_{fn_field}", passed=False, message=f"Function '{fn_name}' not found in package '{package}'"))
+
+        # Also extract every call site from the generated BraneScript and verify each
+        # against the full registry. This catches any LLM-hallucinated function names
+        # beyond the two stored in WorkflowSpec — critical for non-map-reduce patterns
+        # where the LLM may call additional package functions.
+        if branescript:
+            import re as _re
+            _BS_KEYWORDS = {
+                "let", "new", "return", "import", "if", "else", "while", "for",
+                "fn", "true", "false", "null", "in",
+            }
+            known_names = {config.workflow.local_function, config.workflow.combine_function}
+            # Strip annotation lines (#[...] and #![...]) before scanning for call sites
+            # so that annotation keywords like on(), tag(), wf_tag() are not mistaken
+            # for package function calls.
+            non_annotation_code = "\n".join(
+                line for line in branescript.splitlines()
+                if not line.strip().startswith("#[") and not line.strip().startswith("#![")
+            )
+            called_names = (
+                set(_re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', non_annotation_code))
+                - _BS_KEYWORDS
+                - known_names
+            )
+            for fn_name in sorted(called_names):
+                if fn_name in functions:
+                    logger.info("Validator: extra call site '%s' found in package '%s'", fn_name, package)
+                    results.append(RuleResult(rule=f"function_registered_{fn_name}", passed=True, message=None))
+                else:
+                    logger.warning("Validator: extra call site '%s' NOT in package '%s'", fn_name, package)
+                    results.append(RuleResult(
+                        rule=f"function_registered_{fn_name}",
+                        passed=False,
+                        message=f"Function '{fn_name}' is called in the script but not registered in package '{package}'",
+                    ))
 
         return results
 
@@ -197,6 +250,9 @@ class Validator:
                 continue
             if field in WORKFLOW_REGISTRY:
                 construct = WORKFLOW_REGISTRY[field](value)
+                # All #![wf_tag()] constructs are stripped before Brane submission
+                # (same eFLINT bug workaround as #[tag()] — see handle_execution).
+                wf_note = TAG_STRIPPED_NOTE if construct.startswith("#![wf_tag(") else None
                 mappings.append({
                     "participant_node": None,
                     "participant_user_id": None,
@@ -205,7 +261,7 @@ class Validator:
                     "generated_construct": construct,
                     "line": find_line(construct),
                     "flagged": False,
-                    "note": None,
+                    "note": wf_note,
                 })
             else:
                 mappings.append({
@@ -235,7 +291,7 @@ class Validator:
                         "generated_construct": construct,
                         "line": find_line(construct),
                         "flagged": False,
-                        "note": "Aggregated from participant onboarding answers and deduplicated",
+                        "note": f"Aggregated from participant onboarding answers and deduplicated. {TAG_STRIPPED_NOTE}",
                     })
 
         # participant-level mappings
