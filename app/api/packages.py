@@ -52,6 +52,11 @@ def _parse_package_name(container_yml: str) -> str | None:
     return None
 
 
+def _sanitize_container_yml(container_yml: str) -> str:
+    """Fix capital-S type: String → type: string. Brane only accepts lowercase primitive types."""
+    return container_yml.replace("type: String", "type: string")
+
+
 def _parse_functions(container_yml: str) -> tuple:
     """Extract (local_function, combine_function, finalize_function) from container.yml actions."""
     try:
@@ -174,7 +179,7 @@ def _run_generate_bg(project_id: int, study_objective: str, computation_descript
         row.llm_assessment = json.dumps(assessment_data)
         if package is not None:
             row.python_code = package.python_code
-            row.container_yml = package.container_yml
+            row.container_yml = _sanitize_container_yml(package.container_yml)
             row.package_name = package.package_name
             row.local_function = package.local_function
             row.combine_function = package.combine_function
@@ -233,6 +238,7 @@ def _run_upload_bg(project_id: int, study_objective: str) -> None:
         row.assessment_status = new_status
         row.llm_assessment = json.dumps(assessment_data)
         if container_yml:
+            container_yml = _sanitize_container_yml(container_yml)
             row.container_yml = container_yml
             # Parse and store function names so they're available when provisioning the coordinator
             local_fn, combine_fn, finalize_fn = _parse_functions(container_yml)
@@ -409,13 +415,13 @@ def approve_package(
     if request.updated_python_code:
         row.python_code = request.updated_python_code
     if request.updated_container_yml:
-        row.container_yml = request.updated_container_yml
+        row.container_yml = _sanitize_container_yml(request.updated_container_yml)
 
     working_dir = _WORKING_BASE / f"project_{project_id}" / row.package_name
     working_dir.mkdir(parents=True, exist_ok=True)
     container_yml_path = working_dir / "container.yml"
     (working_dir / f"{row.package_name}.py").write_text(row.python_code.replace("\r\n", "\n").replace("\r", "\n"))
-    container_yml_path.write_text(row.container_yml.replace("\r\n", "\n").replace("\r", "\n"))
+    container_yml_path.write_text(_sanitize_container_yml(row.container_yml).replace("\r\n", "\n").replace("\r", "\n"))
     run_sh = working_dir / "run.sh"
     if not run_sh.exists():
         run_sh.write_text(f"#!/bin/bash\npython3 /opt/wd/{row.package_name}.py \"$1\"\n")

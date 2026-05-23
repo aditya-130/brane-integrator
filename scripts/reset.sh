@@ -118,6 +118,27 @@ for db in "$INTEGRATOR_DB" "$MOCK_HUB_DB"; do
 done
 
 echo ""
+echo "=== Step 7: Remove all Brane packages from local registry ==="
+for pkg in $(brane package list 2>/dev/null | awk 'NR>1 {print $1}' | sort -u || true); do
+    echo "  Removing package ${pkg}..."
+    echo "y" | brane package remove "$pkg" 2>/dev/null || true
+done
+
+echo ""
+echo "=== Step 8: Remove all registered Brane datasets ==="
+BRANE_DATA_REGISTRY="${HOME}/.local/share/brane/data"
+if [[ -d "$BRANE_DATA_REGISTRY" ]]; then
+    for ds_dir in "${BRANE_DATA_REGISTRY}"/*/; do
+        if [[ -d "$ds_dir" ]]; then
+            echo "  Removing dataset registry entry: ${ds_dir}..."
+            rm -rf "$ds_dir"
+        fi
+    done
+else
+    echo "  No Brane data registry found — skipping"
+fi
+
+echo ""
 echo "Done. Start the Integrator fresh:"
 echo "  cd $(dirname "$0")/.."
 echo "  uvicorn main:app --reload --port 8000"
