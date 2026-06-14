@@ -77,8 +77,8 @@ Traceability Report (JSON):
 POLICY_FIELDS_REFERENCE = """--- KNOWN POLICY FIELDS ---
 The following policy fields can be extracted from free text. Each field has a fixed set of allowed values that must be matched exactly (case-sensitive):
 
-- identifiability: one of ["Identified", "PseudonymizedBySource", "Anonymized"]
-  Describes how personally identifiable the data is. "Identified" means the dataset contains direct personal identifiers. "PseudonymizedBySource" means identifiers have been replaced with pseudonyms by the data provider before sharing. "Anonymized" means all personal identifiers have been removed and re-identification is not reasonably possible.
+- identifiability: one of ["Identified", "Pseudonymized", "Anonymized"]
+  Describes how personally identifiable the data is. "Identified" means the dataset contains direct personal identifiers. "Pseudonymized" means identifiers have been replaced with pseudonyms by the data provider before sharing. "Anonymized" means all personal identifiers have been removed and re-identification is not reasonably possible.
 
 - data_sensitivity: one of ["low", "medium", "high"]
   Describes the overall sensitivity level of the data. Typically "high" for health or clinical data, "medium" for aggregated or lightly processed data, "low" for fully public or synthetic data.
@@ -352,8 +352,12 @@ IMPORTANT — Data inputs: When a function receives a Brane Data type, Brane JSO
   # then open/read the file directly, e.g. with open(path) or csv.reader
   # Do NOT use os.environ["MY_DATA"] directly — it will include surrounding quotes and cause FileNotFoundError.
 
-Non-Data inputs (numbers, strings, arrays) also arrive as JSON-encoded strings:
-  value = json.loads(os.environ["MY_INPUT"])
+Non-Data inputs that are computation results (RESULT_1, RESULT_2, ACCUMULATOR) arrive
+as double-encoded strings — you MUST call json.loads() TWICE:
+  value = json.loads(json.loads(os.environ["MY_INPUT"]))
+  # first  json.loads: JSON string  → Python string (still looks like JSON)
+  # second json.loads: Python string → Python dict/list/value you can work with
+  # Using only one json.loads gives you a string, not the dict — your code will crash.
 
 --- THE THREE FUNCTIONS YOU MUST GENERATE ---
 Every Brane package needs exactly three functions:
@@ -505,8 +509,40 @@ container.yml (THIS IS NOT DOCKER-COMPOSE — it is a Brane-specific YAML file):
           type: string
 
 CRITICAL: The container.yml must follow this exact Brane format. Do NOT generate a docker-compose.yml. The fields are: name, version, kind (always "ecu"), base (always "python:3.10-slim"), contributors, entrypoint (kind: task, exec: run.sh — ALWAYS run.sh, never the Python filename), actions (one per function with command.args, input, output).
-CRITICAL: ALWAYS use type: string for complex/structured outputs and inputs. NEVER use type: Any — Brane cannot parse Class<Any> return values from ECU packages.
-CRITICAL: You MUST generate all THREE functions (local_function, combine_function, finalize_function) and include all THREE as actions in container.yml."""
+CRITICAL: ALWAYS use type: string (lowercase) for complex/structured outputs and inputs. NEVER use type: Any — Brane cannot parse Class<Any> return values from ECU packages. NEVER use type: String (capital S) — Brane parses this as Class<String> and causes a runtime type mismatch.
+CRITICAL: You MUST generate all THREE functions (local_function, combine_function, finalize_function) and include all THREE as actions in container.yml.
+CRITICAL: You MUST include the dispatch block at the very end of the Python file. Without it Brane cannot call individual functions by name and every execution will silently do nothing:
+  if __name__ == "__main__":
+      import sys
+      {local_function_name: local_fn, combine_function_name: combine_fn, finalize_function_name: finalize_fn}[sys.argv[1]]()
+Use the exact function names given in the user prompt as both the dict keys and the callable values.
+
+--- GENERALITY ACROSS STUDY TYPES ---
+The three-function pattern works for any horizontal federated study, not just simple averages.
+The key design question is: what is the sufficient statistic for your computation?
+
+For statistics (mean, variance, correlation):
+  compute_local  → returns partial sums/counts/cross-products needed to compute the final answer
+  combine_results → adds them together (same structure out as in)
+  finalize       → divides/normalises to produce the final statistic
+
+For ML model training (logistic regression, linear regression, neural nets):
+  compute_local  → returns gradient vector + n_samples from local data
+  combine_results → returns weighted average gradient + total n_samples (same structure)
+  finalize       → applies one gradient descent step, returns model weights
+
+For frequency/distribution studies (histograms, prevalence, rates):
+  compute_local  → returns per-category counts {category: {"count": n, ...}}
+  combine_results → merges dicts, summing counts for matching categories, adding new ones
+  finalize       → converts counts to rates/percentages/prevalences
+
+For survival analysis:
+  compute_local  → returns per-interval {events: n, at_risk: n} counts
+  combine_results → sums events and at_risk per interval
+  finalize       → computes survival probabilities per interval
+
+In every case: combine_results output must have IDENTICAL structure to compute_local output.
+The finalize function is the ONLY place any division, normalisation, or final derivation happens."""
 
 
 PACKAGE_GENERATOR_USER = """Generate a Brane package for the following federated research project.

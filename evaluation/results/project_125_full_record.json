@@ -1,0 +1,343 @@
+{
+    "workflow_id": "e613bcd1-90c0-40da-bb9b-7026b6afb858",
+    "project_id": 125,
+    "cycle_id": 1,
+    "status": "completed",
+    "generation_strategy": "llm",
+    "validation_result": {
+        "passed": true,
+        "rules": [
+            {
+                "rule": "import_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "return_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "on_annotation_participant-1",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "combine_pinned_to_coordinator",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "wf_tag_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "wf_tag_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "wf_tag_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "wf_tag_present",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "tag_annotation_participant-1",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "tag_annotation_participant-1",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "dataset_ref_participant-1",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "combine_exactly_two_args",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "package_registered",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "function_registered_local_function",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "function_registered_combine_function",
+                "passed": true,
+                "message": null
+            },
+            {
+                "rule": "function_registered_finalize",
+                "passed": true,
+                "message": null
+            }
+        ]
+    },
+    "traceability_report": {
+        "generated_workflow": "workflow.bs",
+        "generated_at": "2026-05-24T10:49:07.700197+00:00",
+        "project_id": 125,
+        "mappings": [
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "data_sensitivity",
+                "policy_value": "High",
+                "generated_construct": "#![wf_tag(\"sensitivity.High\")]",
+                "line": 3,
+                "flagged": false,
+                "note": "stripped before Brane submission (eFLINT bug workaround)"
+            },
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "legal_basis",
+                "policy_value": "HIPAA TPO",
+                "generated_construct": "#![wf_tag(\"legal_basis.HIPAA TPO\")]",
+                "line": 4,
+                "flagged": false,
+                "note": "stripped before Brane submission (eFLINT bug workaround)"
+            },
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "third_party_collaboration",
+                "policy_value": "yes",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "security_measures_planned",
+                "policy_value": "['Encryption']",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "jurisdictions",
+                "policy_value": "EU",
+                "generated_construct": "#![wf_tag(\"jurisdiction.EU\")]",
+                "line": 5,
+                "flagged": false,
+                "note": "Aggregated from participant onboarding answers and deduplicated. stripped before Brane submission (eFLINT bug workaround)"
+            },
+            {
+                "participant_node": null,
+                "participant_user_id": null,
+                "policy_field": "jurisdictions",
+                "policy_value": "US",
+                "generated_construct": "#![wf_tag(\"jurisdiction.US\")]",
+                "line": 6,
+                "flagged": false,
+                "note": "Aggregated from participant onboarding answers and deduplicated. stripped before Brane submission (eFLINT bug workaround)"
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "brane_node",
+                "policy_value": "participant-1",
+                "generated_construct": "#[on(\"participant-1\")]",
+                "line": 10,
+                "flagged": false,
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "dataset_name",
+                "policy_value": "cancer_age_125_2",
+                "generated_construct": "new Data { name := \"cancer_age_125_2\" }",
+                "line": 8,
+                "flagged": false,
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "identifiability",
+                "policy_value": "Pseudonymized",
+                "generated_construct": "#[tag(\"identifiability.Pseudonymized\")]",
+                "line": 11,
+                "flagged": false,
+                "note": "stripped before Brane submission (eFLINT bug workaround)"
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "involves_human_research",
+                "policy_value": "Yes",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "retrospective_consent",
+                "policy_value": "Unsure",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "irb_approval",
+                "policy_value": "Yes",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "direct_identifiers",
+                "policy_value": "No",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "quasi_identifiers",
+                "policy_value": "Yes",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "audit_logging_required",
+                "policy_value": "Conditional",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "network_connectivity_policy",
+                "policy_value": "ProxyOnly",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "security_certifications",
+                "policy_value": "['ISO27001', 'HIPAA']",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "data_sharing_agreements",
+                "policy_value": "Yes",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "model_updates_allowed",
+                "policy_value": "AfterDifferentialPrivacy",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "per_round_approval",
+                "policy_value": "No",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "requires_unlearning",
+                "policy_value": "CaseByCase",
+                "generated_construct": null,
+                "line": null,
+                "flagged": true,
+                "reason": "Not enforceable at BraneScript level. Requires human review.",
+                "note": null
+            },
+            {
+                "participant_node": "participant-1",
+                "participant_user_id": 1,
+                "policy_field": "identifiability",
+                "policy_value": "PseudonymizedBySource",
+                "generated_construct": "#[tag(\"identifiability.PseudonymizedBySource\")]",
+                "line": 12,
+                "flagged": false,
+                "note": "Extracted from free-text field 'privacy_legal_notes' (confidence: high)"
+            }
+        ]
+    },
+    "execution_result": {
+        "Colorectal": 62.98,
+        "Lung": 62.11,
+        "Prostate": 68.67,
+        "Leukemia": 48.98,
+        "Lymphoma": 51.44,
+        "Pancreatic": 65.0,
+        "Melanoma": 53.71,
+        "Breast": 50.25
+    }
+}

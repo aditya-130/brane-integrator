@@ -1,0 +1,21 @@
+import project_125_package;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.HIPAA TPO")]
+#![wf_tag("jurisdiction.EU")]
+#![wf_tag("jurisdiction.US")]
+
+let data_1 := new Data { name := "cancer_age_125_2" };
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+#[tag("identifiability.PseudonymizedBySource")]
+let stats_1 := compute_local(data_1);
+
+#[on("coordinator-125")]
+let combined_result := combine_results(stats_1, stats_1);
+
+#[on("coordinator-125")]
+let final_result := finalize(combined_result);
+
+return final_result;

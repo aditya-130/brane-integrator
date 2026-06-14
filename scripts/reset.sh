@@ -63,7 +63,7 @@ for prefix in participant coordinator; do
     for dir in "${BRANE_NODES}/${prefix}"-*/; do
         if [[ -d "$dir" ]]; then
             echo "  Deleting ${dir}..."
-            rm -rf "$dir"
+            sudo rm -rf "$dir"
         fi
     done
 done
