@@ -36,12 +36,13 @@ from app.infrastructure.dtos import (
 )
 from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.llm_service import OpenAILlmService
+from app.infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["packages"])
 
-_WORKING_BASE = Path.home() / "brane" / "packages"
+_WORKING_BASE = settings.brane_packages_dir
 
 
 def _parse_package_name(container_yml: str) -> str | None:

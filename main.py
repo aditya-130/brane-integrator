@@ -24,34 +24,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# On WSL2, Docker Desktop installs its CLI tools at a non-standard path.
+# We extend PATH only when WSL2_MODE is enabled.
 _WSL_DOCKER_PATH = "/mnt/wsl/docker-desktop/cli-tools/usr/bin"
-_CMD_ENV = {**os.environ, "PATH": f"{_WSL_DOCKER_PATH}:{os.environ.get('PATH', '')}"}
+_CMD_ENV = (
+    {**os.environ, "PATH": f"{_WSL_DOCKER_PATH}:{os.environ.get('PATH', '')}"}
+    if settings.WSL2_MODE
+    else dict(os.environ)
+)
 
-# Central containers whose /etc/hosts must point to brane-fwd
+_CENTRAL_DIR = settings.brane_nodes_dir / "central"
 _CENTRAL_CONTAINERS = ["brane-api", "brane-drv", "brane-plr", "brane-prx"]
 
-
-# ── BraneHub helper ────────────────────────────────────────────────────────────
-
-def _cycle_terminal_state(project_id: int) -> Optional[str]:
-    try:
-        response = httpx.get(
-            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}",
-            headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
-            timeout=5,
-        )
-        if response.status_code == 200:
-            return response.json().get("cycle_terminal_state")
-    except Exception as e:
-        logger.warning("Could not reach BraneHub for project %s: %s", project_id, e)
-    return None
-
-
-# ── Infrastructure management ──────────────────────────────────────────────────
-
-_CENTRAL_DIR = Path.home() / "brane" / "nodes" / "central"
-
-# Per-container run args (image and optional --debug appended at runtime)
 _CENTRAL_SPECS: dict[str, list[str]] = {
     "brane-api": [
         "--network", "brane-central", "--restart", "always",
@@ -83,17 +67,36 @@ _CENTRAL_SPECS: dict[str, list[str]] = {
         "-v", f"{_CENTRAL_DIR}/certs:{_CENTRAL_DIR}/certs:rw",
     ],
 }
-# plr has no --debug flag; the others do
 _CENTRAL_DEBUG = {"brane-api", "brane-drv", "brane-prx"}
 
+
+# ── BraneHub helper ────────────────────────────────────────────────────────────
+
+def _cycle_terminal_state(project_id: int) -> Optional[str]:
+    try:
+        response = httpx.get(
+            f"{settings.BRANEHUB_BASE_URL}/api/integration/projects/{project_id}",
+            headers={"X-API-Key": settings.BRANE_INTEGRATOR_API_KEY},
+            timeout=5,
+        )
+        if response.status_code == 200:
+            return response.json().get("cycle_terminal_state")
+    except Exception as e:
+        logger.warning("Could not reach BraneHub for project %s: %s", project_id, e)
+    return None
+
+
+# ── WSL2: central container management ────────────────────────────────────────
+# These functions are only called when WSL2_MODE=true.
+# On native Linux, branectl manages Brane containers and they do not suffer
+# from stale bind-mount issues when the Docker daemon restarts.
 
 def _ensure_central_containers() -> None:
     """
     Recreate any central Brane container that is not running.
-    Handles the WSL2 stale bind-mount issue: Docker Desktop restarts
-    invalidate bind-mount tokens, causing these containers to exit.
-    Image names are read from the existing (exited) containers so no
-    version string needs to be hardcoded here.
+    Needed on WSL2 where Docker Desktop restarts invalidate bind-mount tokens.
+    Image names are read from the existing (exited) containers so no version
+    string needs to be hardcoded here.
     """
     any_recreated = False
     for name, run_args in _CENTRAL_SPECS.items():
@@ -106,7 +109,6 @@ def _ensure_central_containers() -> None:
             logger.info("Central container %s is running", name)
             continue
 
-        # Read image from the exited container so we don't hardcode the version
         img = subprocess.run(
             ["docker", "inspect", "--format", "{{.Config.Image}}", name],
             capture_output=True, text=True, env=_CMD_ENV,
@@ -137,7 +139,6 @@ def _ensure_central_containers() -> None:
 
 
 def _check_brane_central() -> bool:
-    """Returns True if brane-api is running after _ensure_central_containers()."""
     result = subprocess.run(
         ["docker", "inspect", "--format", "{{.State.Running}}", "brane-api"],
         capture_output=True, text=True, env=_CMD_ENV,
@@ -154,11 +155,9 @@ def _check_brane_central() -> bool:
 
 def _rebuild_brane_fwd() -> Optional[str]:
     """
-    Destroy and recreate brane-fwd on the brane-central network.
-    Returns brane-fwd's IP on brane-central, or None on failure.
-
-    socat rules are NOT added here — reconcile() calls _extend_brane_fwd()
-    for each ready DB node after this returns.
+    Destroy and recreate brane-fwd — the socat bridge container that lets
+    central Brane containers reach worker nodes across Docker network boundaries.
+    WSL2-specific: on native Linux, Docker networking does not require this.
     """
     subprocess.run(["docker", "stop", "brane-fwd"], capture_output=True, env=_CMD_ENV)
     subprocess.run(["docker", "rm", "brane-fwd"], capture_output=True, env=_CMD_ENV)
@@ -178,7 +177,6 @@ def _rebuild_brane_fwd() -> Optional[str]:
         logger.error("Failed to create brane-fwd container: %s", result.stderr.strip())
         return None
 
-    # Wait for socat to finish installing before any exec calls
     deadline = time.time() + 30
     while time.time() < deadline:
         check = subprocess.run(
@@ -192,7 +190,6 @@ def _rebuild_brane_fwd() -> Optional[str]:
         logger.error("brane-fwd: socat did not install within 30s")
         return None
 
-    # Get brane-fwd's IP on brane-central so central containers can route to it
     fmt = '{{(index .NetworkSettings.Networks "brane-central").IPAddress}}'
     ip_result = subprocess.run(
         ["docker", "inspect", "brane-fwd", "--format", fmt],
@@ -210,9 +207,8 @@ def _rebuild_brane_fwd() -> Optional[str]:
 def _patch_central_hosts(fwd_ip: str) -> None:
     """
     Rewrite host.docker.internal in each central container's /etc/hosts to
-    point to brane-fwd's IP instead of the Windows host (which hits Hyper-V
-    port exclusions on WSL2). This lets brane-api/drv/plr/prx reach worker
-    nodes through brane-fwd's socat rules.
+    point to brane-fwd instead of the Windows host. WSL2-specific: Hyper-V port
+    exclusions block direct connections from Docker containers to the Windows host.
     """
     patch_cmd = (
         f"grep -v 'host\\.docker\\.internal' /etc/hosts > /tmp/h "
@@ -240,30 +236,27 @@ def _patch_central_hosts(fwd_ip: str) -> None:
 # ── Startup ────────────────────────────────────────────────────────────────────
 
 def _on_startup() -> None:
-    logger.info("Starting Brane Integrator...")
+    logger.info("Starting Brane Integrator (WSL2_MODE=%s)...", settings.WSL2_MODE)
     init_db()
 
-    # 1. Ensure all central Brane containers are running (handles WSL2 stale bind-mounts)
-    _ensure_central_containers()
-    central_ok = _check_brane_central()
-
-    # 2. Rebuild brane-fwd from scratch and patch central containers
-    if central_ok:
-        fwd_ip = _rebuild_brane_fwd()
-        if fwd_ip:
-            _patch_central_hosts(fwd_ip)
+    if settings.WSL2_MODE:
+        _ensure_central_containers()
+        central_ok = _check_brane_central()
+        if central_ok:
+            fwd_ip = _rebuild_brane_fwd()
+            if fwd_ip:
+                _patch_central_hosts(fwd_ip)
+            else:
+                logger.error("brane-fwd rebuild failed — provisioned nodes will be unreachable")
         else:
-            logger.error("brane-fwd rebuild failed — provisioned nodes will be unreachable")
-    else:
-        logger.warning("Skipping brane-fwd rebuild — start brane central node and restart the Integrator")
+            logger.warning("Skipping brane-fwd rebuild — start brane central node and restart")
 
     with Session(engine) as db:
-        # 3. Reset stuck workflows
         stuck = db.exec(
             select(Workflow).where(Workflow.status.in_(["generating", "executing"]))
         ).all()
         for w in stuck:
-            terminal = _cycle_terminal_state(w.project_id)
+            terminal = _cycle_terminal_state(w.project_id) if settings.BRANEHUB_BASE_URL else None
             if terminal is not None:
                 logger.warning(
                     "Cycle already ended on BraneHub (%s) — marking workflow %s failed",
@@ -279,7 +272,6 @@ def _on_startup() -> None:
             db.add(w)
         db.commit()
 
-        # 4. Reconcile all DB-tracked nodes: restart down containers + re-add socat rules
         from app.application.node_provisioner.node_provisioner import NodeProvisioner
         try:
             NodeProvisioner().reconcile(db)
@@ -288,11 +280,6 @@ def _on_startup() -> None:
 
 
 async def _reconcile_loop() -> None:
-    """
-    Background task: every 60 s re-extend brane-fwd socat rules for all ready
-    nodes. Closes the mid-session gap where brane-fwd can be recreated without
-    the Integrator restarting.
-    """
     while True:
         await asyncio.sleep(60)
         try:

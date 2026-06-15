@@ -2,16 +2,16 @@ from sqlalchemy import text
 from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
 
-# Import all models so SQLModel.metadata knows about every table before create_all
-from app.domain import workflow, infra, package  # noqa: F401
+from app.domain import workflow, infra, package  # noqa: F401 — registers all tables
+from app.infrastructure.settings import settings
 
-DATABASE_URL = "sqlite:///./integrator.db"
+engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
 
-engine = create_engine(DATABASE_URL, echo=True)
 
 def init_db():
     SQLModel.metadata.create_all(engine)
     _migrate()
+
 
 def _migrate():
     migrations = [
@@ -35,6 +35,7 @@ def _migrate():
                 conn.commit()
             except Exception:
                 pass  # column already exists
+
 
 def get_db() -> Generator[Session, None, None]:
     with Session(engine) as session:

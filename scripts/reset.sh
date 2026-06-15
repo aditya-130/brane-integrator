@@ -10,13 +10,27 @@
 
 set -euo pipefail
 
-BRANE_NODES="${HOME}/brane/nodes"
-INFRA_YML="${BRANE_NODES}/central/infra.yml"
-INTEGRATOR_DB="$(dirname "$0")/../integrator.db"
-MOCK_HUB_DB="$(dirname "$0")/../../mock-branehub/mock_branehub.db"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${REPO_ROOT}/.env"
 
-WSL_DOCKER="/mnt/wsl/docker-desktop/cli-tools/usr/bin"
-export PATH="${WSL_DOCKER}:${PATH}"
+# Read BRANE_NODES_DIR from .env if present, otherwise fall back to ~/brane/nodes
+BRANE_NODES="${HOME}/brane/nodes"
+if [[ -f "$ENV_FILE" ]]; then
+    val="$(grep -E '^BRANE_NODES_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")"
+    if [[ -n "$val" ]]; then
+        BRANE_NODES="$val"
+    fi
+fi
+
+INFRA_YML="${BRANE_NODES}/central/infra.yml"
+INTEGRATOR_DB="${REPO_ROOT}/integrator.db"
+MOCK_HUB_DB="${REPO_ROOT}/../mock-branehub/mock_branehub.db"
+
+# Extend PATH for Docker CLI only when running on WSL2
+if [[ -d "/mnt/wsl/docker-desktop/cli-tools/usr/bin" ]]; then
+    export PATH="/mnt/wsl/docker-desktop/cli-tools/usr/bin:${PATH}"
+fi
 
 # ── Confirmation ───────────────────────────────────────────────────────────────
 
@@ -71,10 +85,10 @@ done
 echo ""
 echo "=== Step 4: Clean infra.yml ==="
 if [[ -f "$INFRA_YML" ]]; then
-    python3 - <<'PYEOF'
+    python3 - "$INFRA_YML" <<'PYEOF'
 import yaml, re, sys, os
 
-infra_path = os.path.expanduser("~/brane/nodes/central/infra.yml")
+infra_path = sys.argv[1]
 with open(infra_path) as f:
     infra = yaml.safe_load(f) or {}
 

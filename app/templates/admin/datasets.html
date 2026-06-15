@@ -62,7 +62,7 @@
                 accept=".csv" required>
               <div class="form-text" style="font-size:11px">
                 Saved as <code>dataset.csv</code> inside
-                <code>~/brane/data/{name}/</code>
+                <code>{{ brane_data_dir }}/{name}/</code>
               </div>
             </div>
             <button type="submit" class="btn btn-primary btn-sm">Register Dataset</button>
@@ -78,7 +78,7 @@
         <div class="card-body" style="font-size:13px">
           <ol class="mb-3 ps-3">
             <li class="mb-2">
-              Creates <code>~/brane/data/{name}/dataset.csv</code>
+              Creates <code>{{ brane_data_dir }}/{name}/dataset.csv</code>
               from your uploaded file
             </li>
             <li class="mb-2">
@@ -103,13 +103,13 @@
   <!-- Registered datasets table -->
   <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-      <span>Datasets in <code>~/brane/data/</code></span>
+      <span>Datasets in <code>{{ brane_data_dir }}/</code></span>
       <a href="/admin/datasets" class="btn btn-sm btn-outline-secondary" style="font-size:12px">↺ Refresh</a>
     </div>
     <div class="card-body p-0">
       {% if not datasets %}
       <p class="text-center text-muted py-4 mb-0" style="font-size:13px">
-        No datasets found in <code>~/brane/data/</code>
+        No datasets found in <code>{{ brane_data_dir }}/</code>
       </p>
       {% else %}
       <table class="table table-sm table-hover mb-0 align-middle" style="font-size:13px">

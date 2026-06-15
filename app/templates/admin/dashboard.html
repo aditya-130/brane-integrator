@@ -125,8 +125,7 @@
       <div class="card section-card h-100">
         <div class="card-header bg-white fw-semibold">Provision participant node</div>
         <div class="card-body">
-          <form hx-post="/infra/provision"
-                hx-headers='{"X-API-Key": "{{ api_key }}"}'
+          <form hx-post="/admin/provision"
                 hx-target="#provision-result"
                 hx-swap="innerHTML">
             <div class="mb-2">
@@ -152,8 +151,7 @@
       <div class="card section-card h-100">
         <div class="card-header bg-white fw-semibold">Deprovision participant node</div>
         <div class="card-body">
-          <form hx-post="/infra/deprovision"
-                hx-headers='{"X-API-Key": "{{ api_key }}"}'
+          <form hx-post="/admin/deprovision"
                 hx-target="#deprovision-result"
                 hx-swap="innerHTML">
             <div class="mb-2">
@@ -222,13 +220,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // htmx forms that POST JSON-encoded bodies (infra endpoints expect JSON)
+  // Admin provision/deprovision forms POST JSON bodies
   document.body.addEventListener("htmx:configRequest", function(evt) {
     var form = evt.detail.elt.closest("form");
     if (!form) return;
     var action = form.getAttribute("hx-post") || "";
-    if (action.startsWith("/infra/")) {
-      // convert form data to JSON
+    if (action === "/admin/provision" || action === "/admin/deprovision") {
       var data = {};
       new FormData(form).forEach(function(v, k) { data[k] = parseInt(v) || v; });
       evt.detail.parameters = data;

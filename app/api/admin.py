@@ -6,7 +6,6 @@ from typing import Optional
 
 import docker
 import docker.errors
-from pathlib import Path as _Path
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -16,7 +15,7 @@ from sqlmodel import Session, select
 from app.domain.infra import CoordinatorNode, ProvisionedNode, ProjectConfig
 from app.domain.package import PackageSource
 from app.domain.workflow import Workflow
-from app.infrastructure.database import get_db
+from app.infrastructure.database import engine, get_db
 from app.infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -125,7 +124,6 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "node_rows": _build_node_rows(db),
         "project_rows": _build_project_rows(db),
-        "api_key": settings.BRANE_INTEGRATOR_API_KEY,
     })
 
 
@@ -137,17 +135,68 @@ def nodes_status(request: Request, db: Session = Depends(get_db)):
     })
 
 
+# ── Admin-scoped provision/deprovision (no API key required) ──────────────────
+# These routes call the provisioner directly, bypassing the auth middleware
+# (admin/* routes are exempt). Do not expose these outside localhost.
+
+@router.post("/provision")
+async def admin_provision(request: Request):
+    import asyncio
+    from app.application.node_provisioner.node_provisioner import NodeProvisioner
+    from app.infrastructure.branehub_service import BraneHubService
+    body = await request.json()
+    user_id = int(body["user_id"])
+    project_id = int(body["project_id"])
+    brane_node = f"participant-{user_id}"
+
+    def _run():
+        from sqlmodel import Session as _Session
+        with _Session(engine) as db:
+            result = NodeProvisioner().provision(user_id, project_id, db)
+            if result.status == "ready" and settings.BRANEHUB_BASE_URL:
+                BraneHubService().send_participant_ready(project_id, user_id, result.brane_node)
+
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _run)
+    return {"brane_node": brane_node, "status": "provisioning"}
+
+
+@router.post("/deprovision")
+async def admin_deprovision(request: Request):
+    import asyncio
+    from app.application.node_provisioner.node_provisioner import NodeProvisioner
+    from app.infrastructure.branehub_service import BraneHubService
+    body = await request.json()
+    user_id = int(body["user_id"])
+    project_id = int(body["project_id"])
+
+    def _run():
+        from sqlmodel import Session as _Session
+        with _Session(engine) as db:
+            NodeProvisioner().deprovision(user_id, project_id, db)
+            if settings.BRANEHUB_BASE_URL:
+                BraneHubService().send_participant_deprovisioned(project_id, user_id)
+
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _run)
+    return {"status": "deprovisioning"}
+
+
+# ── Dataset management ────────────────────────────────────────────────────────
+
 def _scan_datasets() -> list[dict]:
-    data_base = _Path.home() / "brane" / "data"
+    data_base = settings.brane_data_dir
     if not data_base.exists():
         return []
     results = []
     for d in sorted(data_base.iterdir()):
         if not d.is_dir():
             continue
-        has_csv = (d / "dataset.csv").exists()
-        has_yml = (d / "data.yml").exists()
-        results.append({"name": d.name, "has_csv": has_csv, "has_yml": has_yml})
+        results.append({
+            "name": d.name,
+            "has_csv": (d / "dataset.csv").exists(),
+            "has_yml": (d / "data.yml").exists(),
+        })
     return results
 
 
@@ -156,6 +205,7 @@ def datasets_page(request: Request, msg: str = "", err: str = ""):
     return templates.TemplateResponse("admin/datasets.html", {
         "request": request,
         "datasets": _scan_datasets(),
+        "brane_data_dir": str(settings.brane_data_dir),
         "msg": msg,
         "err": err,
     })
