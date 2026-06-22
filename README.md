@@ -1,126 +1,237 @@
 # Brane Integrator
 
-Policy-driven federated workflow generation for the [Brane](https://github.com/epi-project/brane) framework. The Integrator bridges the BraneHub governance portal with the Brane execution engine: it reads project policies, generates a BraneScript workflow, provisions participant nodes, and drives execution end-to-end.
+Policy-driven federated workflow generation for the [Brane](https://github.com/epi-project/brane) framework.
+
+The Integrator sits between the **BraneHub** governance portal and the **Brane** execution engine. When a data collaboration project is approved in BraneHub, the Integrator automatically reads its policy configuration, generates a BraneScript workflow that enforces those policies, provisions ephemeral Brane worker nodes for each participating institution, executes the workflow, and posts results back to BraneHub. No researcher needs to write BraneScript manually.
 
 ---
 
 ## Table of contents
 
 1. [What it does](#what-it-does)
-2. [Architecture overview](#architecture-overview)
-3. [Prerequisites](#prerequisites)
-4. [First-time Brane setup](#first-time-brane-setup)
-5. [Template worker node](#template-worker-node)
-6. [The branelet binary](#the-branelet-binary)
+2. [How the pipeline works](#how-the-pipeline-works)
+3. [Design decisions](#design-decisions)
+4. [Prerequisites](#prerequisites)
+5. [Installing Brane correctly](#installing-brane-correctly)
+6. [Node template (bundled certs)](#node-template-bundled-certs)
 7. [Installation](#installation)
 8. [Configuration (.env)](#configuration-env)
 9. [Running](#running)
-10. [Admin dashboard](#admin-dashboard)
-11. [Reset and wipe](#reset-and-wipe)
-12. [Known Brane quirks](#known-brane-quirks)
-13. [WSL2-specific notes](#wsl2-specific-notes)
+10. [Running with mock BraneHub](#running-with-mock-branehub)
+11. [Admin dashboard](#admin-dashboard)
+12. [Reset and wipe](#reset-and-wipe)
+13. [Known Brane bugs and workarounds](#known-brane-bugs-and-workarounds)
+14. [WSL2-specific notes](#wsl2-specific-notes)
+15. [Known limitations](#known-limitations)
 
 ---
 
 ## What it does
 
-1. Fetches project and policy data from BraneHub via its REST integration API.
-2. Extracts structured policy claims from free-text fields using parallel LLM calls.
-3. Maps those claims to BraneScript constructs (data-flow restrictions, site annotations, workflow tags) following the Kokash policy-to-construct framework.
-4. Generates a valid BraneScript workflow using either a deterministic map-reduce strategy or an LLM with validate-and-retry.
-5. Provisions ephemeral Brane worker nodes for each participant and coordinator.
-6. Executes the workflow, streams results back, and posts a completion callback to BraneHub.
+Given a BraneHub project with participants, datasets, and policy fields filled in, the Integrator:
+
+1. **Fetches project config from BraneHub** — participant nodes, datasets, package info, and policy fields (structured and free-text).
+2. **Extracts policy claims from free-text** — privacy notes, data provenance, and source-of-truth fields are sent to an LLM in parallel. The LLM extracts structured claims (e.g. `identifiability=Pseudonymized`, `legal_basis=HIPAA TPO`) with confidence scores. Low-confidence claims are discarded.
+3. **Interprets policies into BraneScript constructs** — claims are mapped to `#[on()]`, `#[tag()]`, and `#![wf_tag()]` annotations following the Kokash policy-to-construct framework.
+4. **Generates a valid BraneScript workflow** — using either a deterministic template (map-reduce pattern) or an LLM with validate-and-retry. A 9-rule structural validator checks the output before it is saved.
+5. **Provisions ephemeral Brane worker nodes** — each participant and coordinator gets a Docker-based Brane worker node spun up on demand. Nodes are torn down after the project completes.
+6. **Executes the workflow and reports results** — runs the BraneScript via the Brane CLI, parses the output, and posts a completion callback (result or error) back to BraneHub.
+
+A full **traceability report** is generated alongside every workflow, linking each BraneScript annotation back to the specific policy field or free-text claim that produced it.
 
 ---
 
-## Architecture overview
+## How the pipeline works
 
 ```
-BraneHub (governance)
-       │  REST /api/integration/*
+BraneHub REST API
+       │  POST /api/integration/projects/{id}/workflows/generate
        ▼
-Brane Integrator  (this repo, FastAPI + SQLite)
-       │  branectl / Docker SDK / GraphQL
+┌─────────────────────────────────────────────────────┐
+│  Brane Integrator  (FastAPI + SQLite)               │
+│                                                     │
+│  ConfigParser         ← raw BraneHub project JSON   │
+│       │                                             │
+│  FreeTextExtractor    ← LLM parallel claim scan     │
+│       │                                             │
+│  PolicyInterpreter    ← claims → BraneScript annots │
+│       │                                             │
+│  TemplateGenerator    ← deterministic map-reduce    │
+│   or LlmGenerator     ← GPT-4o + validate & retry  │
+│       │                                             │
+│  Validator (9 rules)  ← structural correctness      │
+│       │                                             │
+│  WorkflowJobHandler   ← saves to DB, uploads to Hub │
+│       │                                             │
+│  WorkflowJobHandler   ← node provision + execution  │
+└─────────────────────────────────────────────────────┘
+       │  brane workflow run
        ▼
-Brane central node  ──►  Brane worker nodes (dynamically provisioned)
+Brane central node  ──►  Brane worker nodes (per participant)
+       │
+       ▼
+BraneHub callback  POST /api/integration/projects/{id}/cycles/{id}/complete
 ```
 
-Key modules:
+**Module layout:**
 
 | Path | Purpose |
 |---|---|
 | `main.py` | FastAPI app, startup lifecycle, WSL2 bridge init |
-| `app/api/` | HTTP routers (infra, workflow, packages, admin) |
-| `app/application/` | Workflow generation, node provisioner, package manager, prompts |
-| `app/infrastructure/` | Settings, database, BraneHub HTTP client |
-| `app/domain/` | SQLModel domain models |
+| `app/api/` | HTTP routers — `workflow.py`, `infra.py`, `packages.py`, `admin.py` |
+| `app/application/workflow_generation/` | Core pipeline — config parser, free-text extractor, policy interpreter, validator, job handler |
+| `app/application/workflow_generation/strategy/` | `template_generator.py` (deterministic) and `llm_generator.py` (LLM + retry) |
+| `app/application/utils/` | `prompts.py` (all LLM prompt constants), `prompt_builder.py` |
+| `app/application/node_provisioner/` | Spin up / tear down Brane worker nodes via Docker SDK + branectl |
+| `app/application/package_manager/` | LLM-assisted Python package authoring and `brane package build/push` |
+| `app/infrastructure/` | Settings, SQLite database, BraneHub HTTP client, OpenAI LLM service |
+| `app/domain/` | SQLModel domain models (Workflow, PackageSource, BraneNode) |
+| `app/templates/` | `node.yml.j2` — Jinja2 template rendered per provisioned node |
+| `brane-node-template/` | Bundled TLS certs and worker config copied when provisioning nodes |
 | `scripts/reset.sh` | Full teardown — wipes all managed nodes and databases |
+
+---
+
+## Design decisions
+
+These explain *why* things work the way they do. Understanding them will save you hours of debugging.
+
+### Single uvicorn worker (never run with `--workers N`)
+
+The abort and dismissed-workflow handlers communicate with the execution handler via two module-level variables:
+
+```python
+_running_processes: dict[str, subprocess.Popen] = {}
+_aborted_workflows: set[str] = set()
+```
+
+These are module-level because a separate `WorkflowJobHandler` instance is created per HTTP request. With multiple uvicorn workers, each worker process has its own copy of these variables — an abort request routed to worker 2 cannot reach the subprocess running in worker 1. Always run with a single worker.
+
+### `Popen` instead of `subprocess.run` for workflow execution
+
+`subprocess.run()` blocks until completion with no handle to the process. The Integrator uses `subprocess.Popen()` so that `handle_abort()` and `handle_dismissed()` can call `proc.terminate()` from a different HTTP request context. The process handle is stored in `_running_processes[workflow_id]` *before* `proc.communicate()` is called.
+
+### Abort coordination ordering invariant
+
+In `handle_abort()`, `_aborted_workflows.add(workflow_id)` **must execute before** `proc.terminate()`. After `proc.communicate()` returns, `handle_execution()` checks `proc.returncode < 0 AND workflow_id in _aborted_workflows` to decide whether the process was killed externally. Both conditions are required — a crash also produces a negative return code, and without the set membership check, a crash would be misreported as an abort.
+
+### Tag stripping before Brane submission (eFLINT bug workaround)
+
+The generated BraneScript includes `#[tag()]` and `#![wf_tag()]` annotations that represent data-flow policies. The Integrator generates these correctly per the Brane design spec, and they are preserved in the database and traceability report. However, they are stripped from the script before it is submitted to `brane workflow run` because of a serialisation bug in `brane-chk` (see [Bug F1](#bug-f1-eflint-tag-annotation-serialisation)). Every stripped annotation is recorded in the traceability report with a note explaining why.
+
+### Pre-validation package push
+
+The 9-rule validator's Rule 9 queries the Brane GraphQL API to verify that every function called in the generated BraneScript actually exists in the package registry. For this check to work, the package must already be pushed to the central node *before* validation runs. The Integrator pushes the package as part of the generation pipeline, before calling the validator.
+
+### Two generation strategies
+
+**`map_reduce` (default):** A deterministic Python template that produces a correct left-fold combine chain for any number of participants. Because the template is built from the config directly, Rules 1–8 of the validator cannot fail by construction. Use this unless you need the LLM's flexibility.
+
+**`llm`:** Sends the full workflow context to GPT-4o and validates the output. If validation fails, it sends a retry prompt listing the failed rules. At most 2 LLM calls are made. The `container.yml` of the built package is included in the prompt so the LLM has exact function signatures and argument counts, which prevents Rule 8 (combine argument count) failures.
+
+### Left-fold combine chain
+
+The BraneScript `combine` function always takes exactly 2 arguments. For N participants the template chains N−1 combine calls:
+
+```
+acc_0 = combine(stats_1, stats_2)
+acc_1 = combine(acc_0,   stats_3)
+acc_2 = combine(acc_1,   stats_4)
+result = acc_2
+```
+
+Each intermediate call gets its own `#[on("coordinator")]` annotation.
 
 ---
 
 ## Prerequisites
 
 - **Python 3.11+**
-- **Docker** (Docker Desktop on WSL2, or Docker Engine on native Linux)
-- **Brane CLI** — `brane` and `branectl` in your PATH
-  - Install: follow https://github.com/epi-project/brane — build from source or use a release binary
-  - Tested with Brane `v2.0.0-beta`
-- **OpenAI API key** — required for LLM workflow generation and package authoring features
+- **Docker** — Docker Desktop on WSL2, or Docker Engine on native Linux
+- **Brane CLI** — `brane` and `branectl` in your PATH (see [Installing Brane correctly](#installing-brane-correctly))
+- **OpenAI API key** — required for LLM workflow generation and LLM-assisted package authoring
 
 ---
 
-## First-time Brane setup
+## Installing Brane correctly
 
-Run this **once** on a new machine to generate certificates, node configs, and start the central containers:
+The Integrator was developed and tested against **Brane 3.0.0-nightly (commit `7175fba8`)**. Brane is not yet on a stable release cycle — using a different commit may produce different behaviour, particularly around the eFLINT policy checker.
+
+### Build from source
+
+```bash
+git clone https://github.com/epi-project/brane
+cd brane
+git checkout 7175fba8
+cargo build --release
+```
+
+After building, `brane` and `branectl` will be at `target/release/brane` and `target/release/branectl`. Add them to your PATH or symlink them to `/usr/local/bin/`.
+
+### Verify your install
+
+```bash
+# Both should print a version string without error
+brane --version
+branectl --version
+
+# Docker must be running
+docker ps
+```
+
+### The branelet binary
+
+`branelet` is the in-container helper that runs package functions. **It must exactly match your `brane` CLI version.** A mismatch causes packages to hang or crash at runtime with no useful error message.
+
+A pre-compiled x86-64 Linux `branelet` matching commit `7175fba8` ships at `bin/branelet` in this repository. Set `BRANELET_PATH` in your `.env` to its absolute path:
+
+```bash
+BRANELET_PATH=/absolute/path/to/brane-integrator/bin/branelet
+```
+
+If you built Brane from source, your matching `branelet` is at `target/release/branelet` in the brane repo.
+
+**Why `--init branelet` matters:** Without it, `brane package build` picks up whatever `branelet` it finds on the system (or inside the base Docker image), which is almost always a version mismatch. This was the source of several hard-to-diagnose package execution failures during development.
+
+### Start the central Brane node
+
+Run this **once** on a fresh machine to generate certificates, node configs, and start the central containers:
 
 ```bash
 branectl start central
 ```
 
-After that, you never need to run it again. On WSL2, the Integrator automatically recreates central containers that go down when Docker Desktop restarts (see [WSL2-specific notes](#wsl2-specific-notes)).
-
-Verify the central node is running:
+Verify it worked:
 
 ```bash
 docker ps | grep brane-
 ```
 
-You should see `brane-api`, `brane-drv`, `brane-plr`, and `brane-prx` containers.
+You should see `brane-api`, `brane-drv`, `brane-plr`, and `brane-prx` running. If any are missing, check `docker logs brane-api` for errors.
+
+On WSL2, the central containers will go down every time Docker Desktop restarts (Windows reboot, Docker update). The Integrator handles this automatically when `WSL2_MODE=true` — see [WSL2-specific notes](#wsl2-specific-notes).
 
 ---
 
-## Node template (bundled certs and config)
+## Node template (bundled certs)
 
-The node provisioner creates participant and coordinator nodes by copying config and cert files from `brane-node-template/` in this repository. No pre-existing worker node is required — everything needed is shipped with the repo.
+When the Integrator provisions a new participant or coordinator node, it needs TLS certificates and a base config to copy into the new node's directory. These are bundled in `brane-node-template/` in this repository — no manual setup is required.
 
-**Important:** The certs in `brane-node-template/` are self-signed and shared across all provisioned nodes. They exist solely to satisfy Brane's TLS requirements in a local single-machine simulation. **Never use these certs in a production or multi-machine deployment** — each institution should generate its own certs with `branectl`.
-
----
-
-## The branelet binary
-
-Brane uses a helper binary called `branelet` to run package functions inside containers. The version bundled with a Brane release must exactly match the version of your `brane` CLI — a mismatch silently produces packages that hang or crash at runtime with no useful error.
-
-**The correct binary for the version tested with this project is included at `bin/branelet`.**
-
-You need to tell the Integrator where to find it via `BRANELET_PATH` in `.env`. It is passed to `brane package build --init <path>` every time a package is built.
-
-```bash
-# Absolute path to the binary in this repo:
-BRANELET_PATH=/path/to/brane-integrator/bin/branelet
+```
+brane-node-template/
+  central-certs/       ← ca.pem, client-id.pem  (registered into central/certs/<node>/)
+  worker-node/         ← certs/, backend.yml, proxy.yml, policies.db, policy secrets
 ```
 
-If you are using a different Brane version, replace `bin/branelet` with the matching binary from your Brane installation (typically at `~/.local/share/brane/branelet` after building from source).
-
-**Why this matters:** Without `--init branelet`, `brane package build` uses whatever `branelet` it finds on the system, which may be outdated or missing. This was the source of many hard-to-diagnose package execution failures during development.
+**Important:** These are self-signed certs shared across all provisioned nodes. They satisfy Brane's TLS requirements in a local single-machine simulation only. **Do not use these in a production or multi-institution deployment** — each institution should generate its own certs with `branectl generate-certs`.
 
 ---
 
 ## Installation
 
 ```bash
-# Clone and enter the repo
-git clone <repo-url> brane-integrator
+# Clone the repo
+git clone https://github.com/aditya-130/brane-integrator
 cd brane-integrator
 
 # Create and activate a virtual environment
@@ -139,52 +250,61 @@ $EDITOR .env
 
 ## Configuration (.env)
 
-All configuration is via environment variables. Copy `.env.example` to `.env` and edit it.
+All configuration is via environment variables in `.env`. Copy `.env.example` and fill it in.
 
-**Required variables:**
+**Required:**
 
 | Variable | Description |
 |---|---|
-| `BRANE_INTEGRATOR_API_KEY` | Shared secret — all API clients must send this in `X-API-Key` |
-| `BRANEHUB_BASE_URL` | URL of your BraneHub instance (empty = standalone mode) |
-| `OPENAI_API_KEY` | Required for LLM features |
-| `BRANE_NODES_DIR` | Absolute path to your Brane node configs directory |
+| `BRANE_INTEGRATOR_API_KEY` | Shared secret — all API clients must send this in `X-API-Key`. Generate with `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+| `BRANEHUB_BASE_URL` | Base URL of your BraneHub instance. Leave empty to run without BraneHub (standalone/mock mode) |
+| `OPENAI_API_KEY` | Required for LLM workflow generation and LLM package authoring |
+| `BRANE_NODES_DIR` | Absolute path to your Brane node directory (the one that contains `central/`) |
 | `BRANE_DATA_DIR` | Absolute path to where Brane dataset files live |
 | `BRANE_RESULTS_DIR` | Absolute path to where Brane writes workflow results |
 | `BRANELET_PATH` | Absolute path to the `branelet` binary (see above) |
 
-**Key optional variables:**
+**Optional / tuning:**
 
 | Variable | Default | Description |
 |---|---|---|
-| `WORKFLOW_GENERATION_STRATEGY` | `map_reduce` | `map_reduce` (deterministic) or `llm` |
-| `BRANE_CLI_PATH` | `brane` (from PATH) | Absolute path to the `brane` CLI binary |
-| `WSL2_MODE` | `false` | Set `true` on WSL2 — enables socat bridge and Docker Desktop PATH |
-| `EXECUTION_TIMEOUT_SECONDS` | `600` | Max seconds to wait for a workflow result |
-| `SQL_ECHO` | `false` | Log all SQL queries (debug only) |
-
-See `.env.example` for the full list with comments.
+| `WORKFLOW_GENERATION_STRATEGY` | `map_reduce` | `map_reduce` (deterministic template) or `llm` (GPT-4o with retry) |
+| `OPENAI_MODEL` | `gpt-4o` | OpenAI model for all LLM calls |
+| `BRANE_CLI_PATH` | `brane` from PATH | Absolute path to the `brane` CLI binary, if not on PATH |
+| `BRANE_API_URL` | `localhost:50051` | Brane API address used by the workflow executor |
+| `WSL2_MODE` | `false` | Set `true` on WSL2 — enables socat bridge and Docker Desktop PATH fix |
+| `EXECUTION_TIMEOUT_SECONDS` | `600` | Seconds before workflow execution is killed |
+| `BRANE_API_CONTAINER` | `brane-api` | Docker container name for the central brane-api |
+| `BRANE_CENTRAL_PACKAGES_PATH` | `/packages` | Path inside brane-api container where packages are stored |
+| `BRANE_PACKAGES_DIR` | `~/.local/share/brane/packages` | Local Brane package registry directory |
+| `DATABASE_URL` | `sqlite:///./integrator.db` | SQLAlchemy database URL |
+| `SQL_ECHO` | `false` | Log all SQL statements (debug only) |
 
 ---
 
 ## Running
 
 ```bash
-# Activate venv if not already active
 source .venv/bin/activate
 
-# Start the Integrator
+# Single worker — required (see Design decisions)
 uvicorn main:app --reload --port 8000
 ```
 
 On startup the Integrator:
-- Initialises the SQLite database (creates tables if absent)
-- On WSL2: recreates any stopped central containers, rebuilds the `brane-fwd` socat bridge, and patches `/etc/hosts` in central containers
-- Resets any stuck `generating`/`executing` workflows to `pending`
-- Reconciles provisioned nodes (restarts stopped containers)
-- Starts a 60 s background loop to keep node state healthy
+- Creates the SQLite database and tables if they do not exist
+- Resets any `generating` or `executing` workflows left over from a previous crash back to `pending`
+- Reconciles provisioned nodes — restarts any stopped Docker containers
+- **WSL2 only:** recreates stopped central Brane containers, rebuilds the `brane-fwd` socat bridge, patches `host.docker.internal` in central containers
+- Starts a 60-second background loop to keep node containers healthy
 
-**With the mock BraneHub** (for standalone testing):
+The API docs are available at `http://localhost:8000/docs`.
+
+---
+
+## Running with mock BraneHub
+
+For standalone testing without a real BraneHub deployment, a minimal mock is included in the sibling directory `../mock-branehub`.
 
 ```bash
 # Terminal 1 — mock BraneHub
@@ -198,7 +318,12 @@ source .venv/bin/activate
 uvicorn main:app --reload --port 8000
 ```
 
-Set `BRANEHUB_BASE_URL=http://localhost:5000` in `.env`.
+In `.env`:
+```
+BRANEHUB_BASE_URL=http://localhost:5000
+```
+
+The mock BraneHub serves a hardcoded project config and receives completion callbacks, letting you test the full pipeline locally. Pre-built test project configs are in `app/mockdata/`.
 
 ---
 
@@ -207,63 +332,99 @@ Set `BRANEHUB_BASE_URL=http://localhost:5000` in `.env`.
 Open `http://localhost:8000/admin` in a browser.
 
 The dashboard shows:
-- All provisioned participant and coordinator nodes with Docker and DB status
-- All registered projects with package build status and latest workflow cycle
-- Forms to provision/deprovision nodes manually, register datasets, and push packages
+- All provisioned participant and coordinator nodes, with Docker container status and DB state
+- All registered projects, with package build status and latest workflow cycle
+- Forms to provision/deprovision nodes, register datasets manually, and push packages
 
-The admin interface has no authentication — it is intended for local use only. Do not expose port 8000 publicly.
+The admin interface has **no authentication**. It is intended for local development use only. Do not expose port 8000 publicly.
 
 ---
 
 ## Reset and wipe
 
-To tear down all Integrator-managed nodes and start completely fresh:
+To tear down everything and start completely fresh:
 
 ```bash
 bash scripts/reset.sh
 ```
 
 This removes:
-- All `participant-*` and `coordinator-*` Docker containers and networks
+- All `participant-*` and `coordinator-*` Docker containers and Docker networks
 - Their working directories under `BRANE_NODES_DIR`
 - Their entries in `central/infra.yml`
-- Their certificates in `central/certs/`
+- Their certificates from `central/certs/`
 - `integrator.db`
-- `mock_branehub.db` (if it exists next to this repo)
+- `mock_branehub.db` (if it exists in the sibling directory)
 
-It does **not** touch the static Brane nodes (worker1, central) or the central node containers.
+It does **not** touch the central Brane node or its containers.
 
 After running, restart the Integrator (and mock BraneHub if using it). Both start with a clean slate.
 
+**Note:** Packages built by the Integrator also live in the local Brane package registry (`BRANE_PACKAGES_DIR`) and in the central node's registry. These are not cleaned up by `reset.sh`. See [Bug F5](#bug-f5-stale-packages-survive-reset) below.
+
 ---
 
-## Known Brane quirks
+## Known Brane bugs and workarounds
 
-These are issues we hit during development that are not obvious from the Brane documentation.
+These are bugs in Brane itself (not in the Integrator) that we hit during development. Each has a workaround implemented in the Integrator, documented here so the reasoning is clear.
 
-### branelet must match your Brane version exactly
+---
 
-Using a mismatched `branelet` causes packages to fail at runtime with cryptic errors. Always pass `--init <path>` to `brane package build`. See [The branelet binary](#the-branelet-binary).
+### Bug F1: eFLINT tag annotation serialisation
 
-### `brane package build` returns exit code 0 on failure
+**Symptom:** Workflows with `#[tag()]` or `#![wf_tag()]` annotations fail to plan with `"Failed to plan workflow"` and a gRPC error from `brane-chk`.
 
-The CLI exits 0 even when the Docker build fails. The Integrator detects this by scanning stdout for `"failed to build"`. If you are calling `brane package build` manually, always read stdout carefully.
+**Root cause:** The eFLINT base ontology defines `tag` as a 2-component fact:
+```
+Fact tag Identified by user * string.   (brane-chk/policy/metadata.eflint)
+```
+But the Rust serialiser in `brane-chk/src/workflow/eflint.rs:74` emits a 1-component assertion:
+```
++tag("identifiability.Pseudonymized")   ← missing the user component
+```
+The eFLINT engine rejects this with `"elements of tag have 2 components, 1 given"`, which propagates as a planner failure.
 
-### `brane data build` registers datasets in a local index only
+**Workaround:** The Integrator strips all `#[tag()]` and `#![wf_tag()]` lines from the script before writing the temp file submitted to `brane workflow run`. The full annotated script is preserved in the database and in BraneHub. Every stripped annotation is recorded in the traceability report with a note: `"stripped before Brane submission (eFLINT bug workaround)"`.
 
-Datasets are registered per-machine. In a real federated deployment, each participant registers their own dataset on their own node. The Integrator's admin dashboard includes a simulation tool for local testing that runs `brane data build` on behalf of a participant.
+---
 
-### eFLINT tag annotations are stripped before execution
+### Bug F2: `brane package build` exits 0 on failure
 
-`#[tag()]` and `#![wf_tag()]` annotations in generated BraneScript are currently stripped by the `brane-chk` serializer due to a bug in the 2-component fact assertion format. The Integrator generates them for traceability and policy-completeness, and they appear correctly in the generated `.bs` file, but they do not influence execution. This is a known upstream bug (tracked as F1 in the thesis).
+**Symptom:** `brane package build` returns exit code 0 even when the Docker build fails, making it impossible to detect failure from the return code alone.
 
-### Stale packages survive `reset.sh`
+**Workaround:** The Integrator's `PackageBuilder` scans stdout for the string `"failed to build"` to detect failure, ignoring the exit code.
 
-`brane package list` and `brane package remove` operate on the local CLI package registry. After a reset, old packages may still appear there. Run `brane package list` and remove them manually if needed, or the Integrator's package build step will silently reuse the cached image.
+---
 
-### `brane package push` requires the central packages directory to be chown'd
+### Bug F3: `brane data build` registers datasets locally only
 
-On WSL2, Docker Desktop bind-mounts can create the central `packages/` directory as `root:root` inside the container, making HTTP push fail. The Integrator's `PackageBuilder.push()` automatically runs `docker exec -u root brane-api chown brane:brane /packages` before each push.
+**Symptom:** Datasets registered with `brane data build` appear in the local CLI index but are not propagated to other nodes.
+
+**Explanation:** In a real federated deployment, each participant institution runs `brane data build` on their own node to register their local dataset. The Brane CLI does not federate dataset registration. The Integrator's admin dashboard provides a simulation tool that runs `brane data build` locally on behalf of each participant for testing purposes only.
+
+---
+
+### Bug F4: `brane package push` fails when packages directory is owned by root
+
+**Symptom:** `brane package push` fails with a permission error. On WSL2, Docker Desktop sometimes creates the central `packages/` directory as `root:root` inside the `brane-api` container.
+
+**Workaround:** `PackageBuilder.push()` always runs `docker exec -u root brane-api chown brane:brane /packages` before every push.
+
+---
+
+### Bug F5: Stale packages survive `reset.sh`
+
+**Symptom:** After a reset and rebuild, `brane package list` still shows old packages. If the package name matches, `brane package build` may silently reuse the cached image.
+
+**Workaround:** After running `reset.sh`, manually clean the local registry:
+```bash
+brane package list
+brane package remove <name> <version>
+```
+Also remove the package from the central node's packages directory if needed:
+```bash
+docker exec -u root brane-api rm -rf /packages/<name>
+```
 
 ---
 
@@ -271,12 +432,46 @@ On WSL2, Docker Desktop bind-mounts can create the central `packages/` directory
 
 Set `WSL2_MODE=true` in `.env` when running on WSL2 with Docker Desktop.
 
-**What this enables:**
+On native Linux, none of the following applies — leave `WSL2_MODE=false`.
 
-1. **Docker Desktop PATH extension** — adds `/mnt/wsl/docker-desktop/cli-tools/usr/bin` to PATH so `docker` is available in subprocesses.
+---
 
-2. **Central container auto-restart** — Docker Desktop restarts its daemon on every Windows reboot, which invalidates bind-mount tokens and stops all Brane containers. The Integrator detects stopped central containers and recreates them on startup without losing state.
+### 1. Docker Desktop PATH extension
 
-3. **brane-fwd socat bridge** — Brane's central containers cannot reach worker node containers across Docker network boundaries on WSL2 (Hyper-V port exclusions block direct connections). The Integrator creates a container called `brane-fwd` on the `brane-central` Docker network and runs `socat` rules inside it to forward traffic to each worker node. It patches `host.docker.internal` in each central container's `/etc/hosts` to point to `brane-fwd`'s IP instead of the Windows host.
+Docker Desktop on WSL2 puts its CLI tools at `/mnt/wsl/docker-desktop/cli-tools/usr/bin`, which is not always on PATH when the Integrator runs subprocesses. When `WSL2_MODE=true`, the Integrator prepends this path to `os.environ["PATH"]` for all subprocess calls.
 
-On native Linux, none of this is needed — `branectl` manages the Brane containers and Docker networking works directly. Leave `WSL2_MODE=false`.
+---
+
+### 2. Central container auto-restart
+
+Docker Desktop restarts its daemon on every Windows reboot and after Docker updates. This stops all Brane central containers (`brane-api`, `brane-drv`, `brane-plr`, `brane-prx`). On startup, the Integrator detects stopped central containers and recreates them via the Docker SDK without losing any state (node configs and certs are on disk).
+
+---
+
+### 3. `brane-fwd` socat bridge
+
+**The problem:** Brane's central containers run on the `brane-central` Docker network. Worker node containers run on their own `brane-worker-<node>` networks. On WSL2, Hyper-V port exclusions prevent direct cross-network connections, so the central containers cannot reach the worker containers via `host.docker.internal`.
+
+**The workaround:** On startup, the Integrator creates a container called `brane-fwd` on the `brane-central` network running `alpine/socat`. For every provisioned worker node, `brane-fwd` gets a `socat` rule that forwards the node's service ports (reg, job, chk, prx) to the corresponding worker container. The Integrator then patches `/etc/hosts` in each central container to replace `host.docker.internal` with `brane-fwd`'s IP on the `brane-central` network.
+
+The result is that central containers reach worker containers via `brane-fwd` as a proxy, bypassing the Hyper-V restriction.
+
+This `brane-fwd` container is rebuilt on every Integrator startup to pick up any new worker nodes provisioned since the last restart.
+
+**On native Linux:** Docker handles cross-network routing directly. `host.docker.internal` resolves correctly, and no bridge is needed.
+
+---
+
+## Known limitations
+
+- **Local simulation only.** The `node.yml.j2` template hardcodes `host.docker.internal` as the external address for all worker services. This works when everything runs on one machine but breaks in a real multi-institution deployment where each node has its own IP. Production deployment would require generating `node.yml` with real external addresses and transferring node configs to remote machines via SSH/SCP (not currently implemented).
+
+- **No real federated networking.** Node provisioning runs entirely on the local machine via Docker. Each "participant node" is a Docker container on the same host, not a remote server. The Integrator simulates federation, it does not implement it.
+
+- **LLM generator retries once.** If the LLM-generated BraneScript fails validation twice, the Integrator reports a generation failure. The failed rules are included in the retry prompt to guide the model, but there is no third attempt.
+
+- **Edited BraneScript in BraneHub is not used.** After the Integrator uploads a generated script to BraneHub, a researcher can edit it in BraneHub's review UI before approving. However, the `RunWorkflow` callback from BraneHub does not transmit the (potentially edited) script — it only carries a `script_version` identifier. The Integrator always executes the original script stored in its database. Edits made in the BraneHub UI are silently discarded.
+
+- **Admin dashboard has no authentication.** The `/admin` interface and the `/api/...` routes protected only by `X-API-Key` are intended for local use. The API key is set in `.env` and included in the admin HTML source — do not expose port 8000 publicly.
+
+- **Dataset registration is manual.** Researchers must register their datasets using the admin dashboard's dataset registration form before running a workflow. There is no automated dataset discovery.
