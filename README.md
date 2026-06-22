@@ -43,36 +43,6 @@ A full **traceability report** is generated alongside every workflow, linking ea
 
 ## How the pipeline works
 
-```
-BraneHub REST API
-       │  POST /api/integration/projects/{id}/workflows/generate
-       ▼
-┌─────────────────────────────────────────────────────┐
-│  Brane Integrator  (FastAPI + SQLite)               │
-│                                                     │
-│  ConfigParser         ← raw BraneHub project JSON   │
-│       │                                             │
-│  FreeTextExtractor    ← LLM parallel claim scan     │
-│       │                                             │
-│  PolicyInterpreter    ← claims → BraneScript annots │
-│       │                                             │
-│  TemplateGenerator    ← deterministic map-reduce    │
-│   or LlmGenerator     ← GPT-4o + validate & retry  │
-│       │                                             │
-│  Validator (9 rules)  ← structural correctness      │
-│       │                                             │
-│  WorkflowJobHandler   ← saves to DB, uploads to Hub │
-│       │                                             │
-│  WorkflowJobHandler   ← node provision + execution  │
-└─────────────────────────────────────────────────────┘
-       │  brane workflow run
-       ▼
-Brane central node  ──►  Brane worker nodes (per participant)
-       │
-       ▼
-BraneHub callback  POST /api/integration/projects/{id}/cycles/{id}/complete
-```
-
 **Module layout:**
 
 | Path | Purpose |
