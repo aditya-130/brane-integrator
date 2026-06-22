@@ -11,18 +11,19 @@ The Integrator sits between the **BraneHub** governance portal and the **Brane**
 1. [What it does](#what-it-does)
 2. [How the pipeline works](#how-the-pipeline-works)
 3. [Design decisions](#design-decisions)
-4. [Prerequisites](#prerequisites)
-5. [Installing Brane correctly](#installing-brane-correctly)
-6. [Node template (bundled certs)](#node-template-bundled-certs)
-7. [Installation](#installation)
-8. [Configuration (.env)](#configuration-env)
-9. [Running](#running)
-10. [Running with mock BraneHub](#running-with-mock-branehub)
-11. [Admin dashboard](#admin-dashboard)
-12. [Reset and wipe](#reset-and-wipe)
-13. [Known Brane bugs and workarounds](#known-brane-bugs-and-workarounds)
-14. [WSL2-specific notes](#wsl2-specific-notes)
-15. [Known limitations](#known-limitations)
+4. [Supported workflow patterns](#supported-workflow-patterns)
+5. [Writing a Brane package](#writing-a-brane-package)
+6. [Prerequisites](#prerequisites)
+7. [Installing Brane correctly](#installing-brane-correctly)
+8. [Node template (bundled certs)](#node-template-bundled-certs)
+9. [Installation](#installation)
+10. [Configuration (.env)](#configuration-env)
+11. [Running](#running)
+12. [Admin dashboard](#admin-dashboard)
+13. [Reset and wipe](#reset-and-wipe)
+14. [Known Brane bugs and workarounds](#known-brane-bugs-and-workarounds)
+15. [WSL2-specific notes](#wsl2-specific-notes)
+16. [Known limitations](#known-limitations)
 
 ---
 
@@ -127,6 +128,116 @@ result = acc_2
 ```
 
 Each intermediate call gets its own `#[on("coordinator")]` annotation.
+
+---
+
+## Supported workflow patterns
+
+The Integrator supports the **federated map-reduce** pattern only. This covers a large class of statistical analyses but has specific structural requirements.
+
+**What works:**
+
+- One package per project, containing exactly three functions: `compute_local`, `combine_results`, and `finalize`
+- Any number of participants (N ≥ 1)
+- Each participant runs `compute_local` on their local dataset; the coordinator aggregates results with chained `combine_results` calls; `finalize` computes the final answer
+- Tabular data (CSV) or any other file format your package can read — the Integrator just passes a file path, the package handles reading
+- Statistical computations: averages, counts, sums, distributions, survival analysis, model training with federated gradient aggregation, etc. — anything expressible as local computation followed by aggregation
+
+**What does not work (current scope):**
+
+- **Multi-round iterative workflows** — the generated BraneScript is a single linear pass. Iterative training loops (e.g. multiple rounds of gradient exchange) would require the parallel BraneScript construct (`#![on()]` inside a `parallel []` block), which the current generator and validator do not support.
+- **Multiple packages in one workflow** — the Integrator generates one `import` statement for one package. Workflows that chain different packages (e.g. preprocessing → analysis → visualisation) are not supported.
+- **Workflows without a combine step** — the template always generates a combine call. For N=1 the left-fold degenerates gracefully (`let result := stats_1;`), but the package must still define `combine_results`.
+- **Real multi-machine federation** — all nodes run as Docker containers on one machine. See [Known limitations](#known-limitations).
+
+---
+
+## Writing a Brane package
+
+A Brane package is a Python file executed inside a Docker container. The Integrator can generate packages via LLM (Path A/B in the admin dashboard), but if you write one manually these are the rules that must be followed exactly.
+
+A complete, working example is at [`examples/cancer_avg_package.py`](examples/cancer_avg_package.py). It computes per-cancer-type average age federated across multiple sites.
+
+### The three required functions
+
+Every package used by the Integrator must define exactly three functions:
+
+| Function | Runs on | Input | Output |
+|---|---|---|---|
+| `compute_local` | each participant node | local dataset file path | partial result (same shape as `combine_results` output) |
+| `combine_results` | coordinator | two partial results | merged partial result (same shape — must be an accumulator, not a finalizer) |
+| `finalize` | coordinator | final accumulated result | human-readable answer |
+
+### Input encoding
+
+Brane passes all inputs via environment variables. The encoding depends on the type declared in `container.yml`:
+
+**`Data` type (a dataset file path):**
+```python
+path = json.loads(os.environ["LOCAL_DATA"])
+# One json.loads — Brane JSON-encodes the path string once
+with open(path) as f:
+    ...
+```
+
+**`String` type (a result from another function):**
+```python
+result = json.loads(json.loads(os.environ["RESULT_1"]))
+# Two json.loads — results are double-encoded by Brane's container runtime
+```
+
+### Output encoding
+
+Always double-encode output regardless of what the value contains:
+
+```python
+result = {"count": 10, "sum": 500.0}
+print(json.dumps({"output": json.dumps(result)}))
+#                           ^^^^^^^^^^^^^^^^^^^
+#                           inner dumps: dict → string
+#                outer dumps: wraps the Brane envelope
+```
+
+On error, use the same pattern:
+```python
+print(json.dumps({"output": json.dumps({"error": str(e)})}))
+```
+
+### `combine_results` must be an accumulator
+
+`combine_results` receives exactly two arguments (`RESULT_1` and `RESULT_2`) and must output the **same structure** as `compute_local`. This is because BraneScript chains combine in a left-fold for N > 2 participants — the output of one combine call becomes the first input of the next. Never divide or finalise inside `combine_results`. Only accumulate partial sums/counts.
+
+```python
+# CORRECT — accumulator pattern
+def combine_results():
+    r1 = json.loads(json.loads(os.environ["RESULT_1"]))
+    r2 = json.loads(json.loads(os.environ["RESULT_2"]))
+    merged = {"count": r1["count"] + r2["count"], "sum": r1["sum"] + r2["sum"]}
+    print(json.dumps({"output": json.dumps(merged)}))
+
+# WRONG — computing a final answer here breaks left-fold for N > 2
+def combine_results():
+    ...
+    mean = total_sum / total_count  # ← don't do this here
+```
+
+### Dispatch block
+
+The bottom of every package file must dispatch by `sys.argv[1]`:
+
+```python
+if __name__ == "__main__":
+    import sys
+    {
+        "compute_local": compute_local,
+        "combine_results": combine_results,
+        "finalize": finalize,
+    }[sys.argv[1]]()
+```
+
+### `container.yml` types
+
+In `container.yml`, always use `type: string` (lowercase) for function outputs and for `String` inputs. Never use `type: String` (capital S) — Brane parses that as a class reference and produces a runtime type mismatch. Dataset inputs use `type: Data`.
 
 ---
 
@@ -288,31 +399,6 @@ The API docs are available at `http://localhost:8000/docs`.
 
 ---
 
-## Running with mock BraneHub
-
-For standalone testing without a real BraneHub deployment, a minimal mock is included in the sibling directory `../mock-branehub`.
-
-```bash
-# Terminal 1 — mock BraneHub
-cd ../mock-branehub
-source .venv/bin/activate
-uvicorn main:app --reload --port 5000
-
-# Terminal 2 — Integrator
-cd ../brane-integrator
-source .venv/bin/activate
-uvicorn main:app --reload --port 8000
-```
-
-In `.env`:
-```
-BRANEHUB_BASE_URL=http://localhost:5000
-```
-
-The mock BraneHub serves a hardcoded project config and receives completion callbacks, letting you test the full pipeline locally. Pre-built test project configs are in `app/mockdata/`.
-
----
-
 ## Admin dashboard
 
 Open `http://localhost:8000/admin` in a browser.
@@ -340,11 +426,10 @@ This removes:
 - Their entries in `central/infra.yml`
 - Their certificates from `central/certs/`
 - `integrator.db`
-- `mock_branehub.db` (if it exists in the sibling directory)
 
 It does **not** touch the central Brane node or its containers.
 
-After running, restart the Integrator (and mock BraneHub if using it). Both start with a clean slate.
+After running, restart the Integrator. It starts with a clean slate.
 
 **Note:** Packages built by the Integrator also live in the local Brane package registry (`BRANE_PACKAGES_DIR`) and in the central node's registry. These are not cleaned up by `reset.sh`. See [Bug F5](#bug-f5-stale-packages-survive-reset) below.
 
@@ -456,7 +541,7 @@ This `brane-fwd` container is rebuilt on every Integrator startup to pick up any
 
 - **LLM generator retries once.** If the LLM-generated BraneScript fails validation twice, the Integrator reports a generation failure. The failed rules are included in the retry prompt to guide the model, but there is no third attempt.
 
-- **Edited BraneScript in BraneHub is not used.** After the Integrator uploads a generated script to BraneHub, a researcher can edit it in BraneHub's review UI before approving. However, the `RunWorkflow` callback from BraneHub does not transmit the (potentially edited) script — it only carries a `script_version` identifier. The Integrator always executes the original script stored in its database. Edits made in the BraneHub UI are silently discarded.
+- **No researcher-side script editing.** Once a BraneScript is generated and uploaded to BraneHub for review, there is no mechanism for researchers to modify it before approving. The review UI shows the script for inspection only. Future work could integrate a JupyterLab environment where researchers edit and re-validate the script interactively before triggering execution, but this is out of scope for the current implementation.
 
 - **Admin dashboard has no authentication.** The `/admin` interface and the `/api/...` routes protected only by `X-API-Key` are intended for local use. The API key is set in `.env` and included in the admin HTML source — do not expose port 8000 publicly.
 
