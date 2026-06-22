@@ -32,11 +32,12 @@ The Integrator sits between the **BraneHub** governance portal and the **Brane**
 Given a BraneHub project with participants, datasets, and policy fields filled in, the Integrator:
 
 1. **Fetches project config from BraneHub** — participant nodes, datasets, package info, and policy fields (structured and free-text).
-2. **Extracts policy claims from free-text** — privacy notes, data provenance, and source-of-truth fields are sent to an LLM in parallel. The LLM extracts structured claims (e.g. `identifiability=Pseudonymized`, `legal_basis=HIPAA TPO`) with confidence scores. Low-confidence claims are discarded.
-3. **Interprets policies into BraneScript constructs** — claims are mapped to `#[on()]`, `#[tag()]`, and `#![wf_tag()]` annotations following the Kokash policy-to-construct framework.
-4. **Generates a valid BraneScript workflow** — using either a deterministic template (map-reduce pattern) or an LLM with validate-and-retry. A 9-rule structural validator checks the output before it is saved.
-5. **Provisions ephemeral Brane worker nodes** — each participant and coordinator gets a Docker-based Brane worker node spun up on demand. Nodes are torn down after the project completes.
-6. **Executes the workflow and reports results** — runs the BraneScript via the Brane CLI, parses the output, and posts a completion callback (result or error) back to BraneHub.
+2. **Manages the Brane package** — generates the Python package code and `container.yml` via LLM if not already built, then builds and pushes the package to the Brane registry so it is available for execution.
+3. **Extracts policy claims from free-text** — privacy notes, data provenance, and source-of-truth fields are sent to an LLM in parallel. The LLM extracts structured claims (e.g. `identifiability=Pseudonymized`, `legal_basis=HIPAA TPO`) with confidence scores. Low-confidence claims are discarded.
+4. **Interprets policies into BraneScript constructs** — claims are mapped to `#[on()]`, `#[tag()]`, and `#![wf_tag()]` annotations following the Kokash policy-to-construct framework.
+5. **Generates a valid BraneScript workflow** — using either a deterministic template (map-reduce pattern) or an LLM with validate-and-retry. A 9-rule structural validator checks the output before it is saved.
+6. **Provisions temporary Brane worker nodes** — each participant and coordinator gets a Docker-based Brane worker node spun up on demand. Nodes are torn down after the project completes.
+7. **Executes the workflow and reports results** — runs the BraneScript via the Brane CLI, parses the output, and posts a completion callback (result or error) back to BraneHub.
 
 A full **traceability report** is generated alongside every workflow, linking each BraneScript annotation back to the specific policy field or free-text claim that produced it.
 
