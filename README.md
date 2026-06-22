@@ -31,7 +31,7 @@ The Integrator sits between the **BraneHub** governance portal and the **Brane**
 
 Given a BraneHub project with participants, datasets, and policy fields filled in, the Integrator:
 
-1. **Fetches project config from BraneHub** — participant nodes, datasets, package info, and policy fields (structured and free-text).
+1. **Fetches project config from BraneHub** — participant nodes, dataset identifiers, package info, and policy fields (structured and free-text). The actual dataset files never leave the participant's node — only the dataset name is used to generate the BraneScript data declaration.
 2. **Manages the Brane package** — generates the Python package code and `container.yml` via LLM if not already built, then builds and pushes the package to the Brane registry so it is available for execution.
 3. **Extracts policy claims from free-text** — privacy notes, data provenance, and source-of-truth fields are sent to an LLM in parallel. The LLM extracts structured claims (e.g. `identifiability=Pseudonymized`, `legal_basis=HIPAA TPO`) with confidence scores. Low-confidence claims are discarded.
 4. **Interprets policies into BraneScript constructs** — claims are mapped to `#[on()]`, `#[tag()]`, and `#![wf_tag()]` annotations following the Kokash policy-to-construct framework.
