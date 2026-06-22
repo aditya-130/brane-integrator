@@ -1,8 +1,8 @@
 import logging
 import re
 from app.domain.config import IntegratorConfig
-from app.application.policy_interpreter import InterpretedWorkflow
-from app.application.prompts import LLM_GENERATOR_SYSTEM, LLM_GENERATOR_USER, LLM_GENERATOR_RETRY_SUFFIX
+from app.application.workflow_generation.policy_interpreter import InterpretedWorkflow
+from app.application.utils.prompts import LLM_GENERATOR_SYSTEM, LLM_GENERATOR_USER, LLM_GENERATOR_RETRY_SUFFIX
 from app.infrastructure.llm_service import LlmService
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class LlmGenerator:
         self.llm_calls_made = 0
 
     def generate(self, config: IntegratorConfig, interpreted: InterpretedWorkflow, container_yml: str | None = None) -> str:
-        from app.application.validator import Validator
+        from app.application.workflow_generation.validator import Validator
 
         self.llm_calls_made = 0
         system = LLM_GENERATOR_SYSTEM

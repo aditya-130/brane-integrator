@@ -2,7 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from app.application.prompts import (
+from app.application.utils.prompts import (
     PACKAGE_GENERATOR_SCHEMA,
     PACKAGE_GENERATOR_SYSTEM,
     PACKAGE_GENERATOR_USER,

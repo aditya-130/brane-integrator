@@ -1,5 +1,5 @@
 from app.domain.config import IntegratorConfig
-from app.application.policy_interpreter import InterpretedWorkflow
+from app.application.workflow_generation.policy_interpreter import InterpretedWorkflow
 
 
 class TemplateGenerator:

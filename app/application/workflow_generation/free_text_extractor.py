@@ -1,10 +1,10 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from app.application.prompts import FREE_TEXT_EXTRACTION_SCHEMA
+from app.application.utils.prompts import FREE_TEXT_EXTRACTION_SCHEMA
 from app.domain.config import ExtractedClaim, IntegratorConfig, ParticipantPolicy
 from app.infrastructure.llm_service import LlmService
-from app.application.prompt_builder import PromptBuilder
+from app.application.utils.prompt_builder import PromptBuilder
 
 logger = logging.getLogger(__name__)
 

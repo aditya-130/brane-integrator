@@ -9,13 +9,13 @@ from datetime import datetime, timezone
 from app.infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
-from app.application.config_parser import ConfigParser
-from app.application.free_text_extractor import FreeTextExtractor
-from app.application.policy_interpreter import PolicyInterpreter
-from app.application.prompt_builder import PromptBuilder
-from app.application.workflow_generation.template_generator import TemplateGenerator
-from app.application.workflow_generation.llm_generator import LlmGenerator
-from app.application.validator import Validator
+from app.application.workflow_generation.config_parser import ConfigParser
+from app.application.workflow_generation.free_text_extractor import FreeTextExtractor
+from app.application.workflow_generation.policy_interpreter import PolicyInterpreter
+from app.application.utils.prompt_builder import PromptBuilder
+from app.application.workflow_generation.strategy.template_generator import TemplateGenerator
+from app.application.workflow_generation.strategy.llm_generator import LlmGenerator
+from app.application.workflow_generation.validator import Validator
 from sqlmodel import Session, select
 from app.domain.workflow import Workflow
 from app.domain.package import PackageSource
@@ -216,8 +216,9 @@ class WorkflowJobHandler:
 
         # 4. run brane CLI — Popen so handle_abort/handle_dismissed can kill the process
         start_time = time.time()
+        brane_cli = settings.BRANE_CLI_PATH or "brane"
         proc = subprocess.Popen(
-            ["/usr/local/bin/brane", "workflow", "run", "--remote", "central", tmpfile],
+            [brane_cli, "workflow", "run", "--remote", "central", tmpfile],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

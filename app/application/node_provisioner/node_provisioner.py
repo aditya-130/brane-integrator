@@ -16,6 +16,7 @@ from sqlmodel import Session, select
 from app.domain.infra import CoordinatorNode, ParticipantNodeMap, ProvisionedNode
 from app.domain.package import PackageSource
 from app.application.package_manager.package_builder import PackageBuilder
+from app.infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +24,20 @@ logger = logging.getLogger(__name__)
 
 _BASE_PORT = 51000
 _PORTS_PER_NODE = 5          # reg, job, chk_deliberation, chk_store, prx
-_BRANE_NODES_DIR = Path.home() / "brane" / "nodes"
-_TEMPLATE_NODE = "worker1"   # copy certs/secrets/proxy/backend from here
-_CENTRAL_INFRA_YML = _BRANE_NODES_DIR / "central" / "infra.yml"
-_HEALTH_TIMEOUT = 60         # seconds
-_HEALTH_INTERVAL = 2         # seconds between TCP connect retries
-
-# WSL2: docker/branectl need the Docker Desktop CLI tools on PATH
-_WSL_DOCKER_PATH = "/mnt/wsl/docker-desktop/cli-tools/usr/bin"
-_CMD_ENV = {**os.environ, "PATH": f"{_WSL_DOCKER_PATH}:{os.environ.get('PATH', '')}"}
+_HEALTH_TIMEOUT = 60
+_HEALTH_INTERVAL = 2
 
 _TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
+_NODE_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "brane-node-template"
+
+# On WSL2, Docker Desktop places its CLI tools at a non-standard path.
+# _CMD_ENV extends PATH only when WSL2_MODE is enabled.
+_WSL_DOCKER_PATH = "/mnt/wsl/docker-desktop/cli-tools/usr/bin"
+_CMD_ENV = (
+    {**os.environ, "PATH": f"{_WSL_DOCKER_PATH}:{os.environ.get('PATH', '')}"}
+    if settings.WSL2_MODE
+    else dict(os.environ)
+)
 
 
 # ── Data classes ───────────────────────────────────────────────────────────────
@@ -57,8 +61,6 @@ class ProvisionResult:
 # ── Private helpers ────────────────────────────────────────────────────────────
 
 def _check_node_running(brane_node: str) -> bool:
-    # All four services must be running — chk/prx can exit 127 on WSL2 bind-mount staleness
-    # while brane-job stays up, so checking only brane-job misses a partially-down node.
     for svc in ("reg", "job", "chk", "prx"):
         result = subprocess.run(
             ["docker", "inspect", "--format", "{{.State.Running}}", f"brane-{svc}-{brane_node}"],
@@ -70,10 +72,6 @@ def _check_node_running(brane_node: str) -> bool:
 
 
 def _find_active_node_for_user(user_id: int, db: Session) -> Optional[ProvisionedNode]:
-    """
-    Returns any existing ready ProvisionedNode for this user across all projects.
-    A participant has one physical node shared across all projects they join.
-    """
     return db.exec(
         select(ProvisionedNode).where(
             ProvisionedNode.user_id == user_id,
@@ -93,11 +91,6 @@ def _is_port_free(port: int) -> bool:
 
 
 def _allocate_ports(db: Session) -> PortBlock:
-    """
-    Returns the next free block of 5 ports. Starts from the block after the
-    highest port in the DB, then scans upward until all 5 ports in the block
-    are actually free at the OS level (handles stale containers not in the DB).
-    """
     p_rows = db.exec(select(ProvisionedNode)).all()
     c_rows = db.exec(select(CoordinatorNode)).all()
     all_ports = []
@@ -132,8 +125,8 @@ def _render_node_yml(working_dir: Path, brane_node: str, ports: PortBlock) -> No
     rendered = tmpl.render(
         brane_node=brane_node,
         working_dir=str(working_dir),
-        data_dir=str(Path.home() / "brane" / "data"),
-        results_dir=str(Path.home() / "brane" / "results"),
+        data_dir=str(settings.brane_data_dir),
+        results_dir=str(settings.brane_results_dir),
         port_reg=ports.reg,
         port_job=ports.job,
         port_chk_deliberation=ports.chk_deliberation,
@@ -144,8 +137,7 @@ def _render_node_yml(working_dir: Path, brane_node: str, ports: PortBlock) -> No
 
 
 def _copy_template_files(working_dir: Path) -> None:
-    """Copy certs, proxy.yml, backend.yml, policies.db, and policy secrets from the template node."""
-    src = _BRANE_NODES_DIR / _TEMPLATE_NODE
+    src = _NODE_TEMPLATE_DIR / "worker-node"
     shutil.copytree(src / "certs", working_dir / "certs", dirs_exist_ok=True)
     for fname in ("proxy.yml", "backend.yml", "policies.db",
                   "policy_delib_secret.json", "policy_store_secret.json"):
@@ -154,13 +146,11 @@ def _copy_template_files(working_dir: Path) -> None:
 
 
 def _register_central_cert(brane_node: str) -> None:
-    src = _BRANE_NODES_DIR / "central" / "certs" / _TEMPLATE_NODE
-    dst = _BRANE_NODES_DIR / "central" / "certs" / brane_node
+    src = _NODE_TEMPLATE_DIR / "central-certs"
+    dst = settings.brane_nodes_dir / "central" / "certs" / brane_node
     dst.mkdir(parents=True, exist_ok=True)
     for fname in ("ca.pem", "client-id.pem"):
-        src_file = src / fname
-        if src_file.exists():
-            shutil.copy2(src_file, dst / fname)
+        shutil.copy2(src / fname, dst / fname)
     logger.info("Registered central cert for %s", brane_node)
 
 
@@ -179,7 +169,6 @@ def _start_node(working_dir: Path) -> None:
 
 
 def _health_check(host: str, ports: PortBlock) -> None:
-    """TCP-connect to reg and job ports, retry until both respond or timeout."""
     deadline = time.time() + _HEALTH_TIMEOUT
     for port in (ports.reg, ports.job):
         while True:
@@ -194,8 +183,8 @@ def _health_check(host: str, ports: PortBlock) -> None:
 
 
 def _patch_infra_yml(brane_node: str, ports: PortBlock) -> None:
-    """Append a new location entry to central/infra.yml."""
-    with open(_CENTRAL_INFRA_YML) as f:
+    infra_yml = settings.brane_nodes_dir / "central" / "infra.yml"
+    with open(infra_yml) as f:
         infra = yaml.safe_load(f)
 
     infra.setdefault("locations", {})[brane_node] = {
@@ -204,15 +193,12 @@ def _patch_infra_yml(brane_node: str, ports: PortBlock) -> None:
         "registry": f"host.docker.internal:{ports.reg}",
     }
 
-    with open(_CENTRAL_INFRA_YML, "w") as f:
+    with open(infra_yml, "w") as f:
         yaml.dump(infra, f, default_flow_style=False, allow_unicode=True)
     logger.info("Patched infra.yml with %s", brane_node)
 
 
 def _get_container_ip(container_name: str, network: str) -> str:
-    # Avoid Go template dot-notation with hyphens (e.g. brane-worker-coordinator-50
-    # contains hyphens which the template engine treats as subtraction operators).
-    # Use index notation to safely look up the network by name.
     fmt = '{{index .NetworkSettings.Networks "' + network + '" "IPAddress"}}'
     result = subprocess.run(
         ["docker", "inspect", container_name, "--format", fmt],
@@ -221,11 +207,11 @@ def _get_container_ip(container_name: str, network: str) -> str:
     return result.stdout.strip()
 
 
-
 def _extend_brane_fwd(brane_node: str, ports: PortBlock) -> None:
     """
-    Connect the new worker network to brane-fwd and add socat forwarding
-    rules so central containers can reach the new node via host.docker.internal.
+    Connect the worker network to brane-fwd and add socat forwarding rules.
+    WSL2-specific: on native Linux, Docker networking does not require this bridge.
+    Only called when WSL2_MODE=true.
     """
     network = f"brane-worker-{brane_node}"
     subprocess.run(
@@ -252,7 +238,6 @@ def _extend_brane_fwd(brane_node: str, ports: PortBlock) -> None:
 
 
 def _get_chk_ports_from_container(brane_node: str) -> tuple[int, int]:
-    """Inspect brane-chk-{brane_node} to find its exposed ports (delib, store)."""
     result = subprocess.run(
         ["docker", "inspect", f"brane-chk-{brane_node}", "--format", "{{json .HostConfig.PortBindings}}"],
         capture_output=True, text=True, env=_CMD_ENV,
@@ -269,14 +254,12 @@ def _get_chk_ports_from_container(brane_node: str) -> tuple[int, int]:
 
 def _extend_brane_fwd_static() -> None:
     """
-    Ensure static (pre-existing) nodes listed in infra.yml but NOT provisioned by the
-    Integrator are accessible via brane-fwd. Called from reconcile so rules survive
-    brane-fwd restarts. Reads reg/job ports from infra.yml; chk ports from container bindings.
+    Re-add socat rules for static nodes (those in infra.yml but not provisioned
+    by the Integrator). WSL2-specific — only called when WSL2_MODE=true.
     """
-    # Nodes managed by the NodeProvisioner start with "participant-" or "coordinator-"
-    # Anything else in infra.yml is a static node that needs manual socat wiring.
+    infra_yml = settings.brane_nodes_dir / "central" / "infra.yml"
     try:
-        with open(_CENTRAL_INFRA_YML) as f:
+        with open(infra_yml) as f:
             infra = yaml.safe_load(f) or {}
     except Exception as exc:
         logger.warning("_extend_brane_fwd_static: could not read infra.yml: %s", exc)
@@ -285,9 +268,8 @@ def _extend_brane_fwd_static() -> None:
     managed_prefixes = ("participant-", "coordinator-")
     for location_name, loc in infra.get("locations", {}).items():
         if any(location_name.startswith(p) for p in managed_prefixes):
-            continue  # handled by the normal dynamic provisioning path
+            continue
         try:
-            # Parse port from "host.docker.internal:PORT"
             reg_port = int(loc.get("registry", ":0").split(":")[-1])
             job_port = int(loc.get("delegate", ":0").split(":")[-1])
             chk_delib, chk_store = _get_chk_ports_from_container(location_name)
@@ -307,20 +289,21 @@ def _extend_brane_fwd_static() -> None:
 
 
 def _remove_from_infra_yml(brane_node: str) -> None:
-    with open(_CENTRAL_INFRA_YML) as f:
+    infra_yml = settings.brane_nodes_dir / "central" / "infra.yml"
+    with open(infra_yml) as f:
         infra = yaml.safe_load(f)
     infra.get("locations", {}).pop(brane_node, None)
-    with open(_CENTRAL_INFRA_YML, "w") as f:
+    with open(infra_yml, "w") as f:
         yaml.dump(infra, f, default_flow_style=False, allow_unicode=True)
 
 
 def _register_dataset(dataset_name: str, file_bytes: bytes | None = None) -> None:
     """
-    Simulate a participant registering their dataset on their provisioned node.
-    In production this is done by hospital IT on their own server.
-    Steps: write dataset.csv (if uploaded), write data.yml, run brane data build.
+    Register a dataset with Brane's local data index.
+    In a real deployment the hospital IT team does this on their own node.
+    This simulates the step locally for end-to-end testing.
     """
-    data_dir = Path.home() / "brane" / "data" / dataset_name
+    data_dir = settings.brane_data_dir / dataset_name
     data_dir.mkdir(parents=True, exist_ok=True)
 
     if file_bytes is not None:
@@ -370,7 +353,6 @@ class NodeProvisioner:
     def provision(self, user_id: int, project_id: int, db: Session) -> ProvisionResult:
         brane_node = f"participant-{user_id}"
 
-        # ── Idempotency: already provisioned for this exact project ──
         existing = db.exec(
             select(ProvisionedNode).where(
                 ProvisionedNode.user_id == user_id,
@@ -382,7 +364,6 @@ class NodeProvisioner:
             logger.info("Node %s already ready for project %d", brane_node, project_id)
             return ProvisionResult(brane_node=brane_node, status="ready")
 
-        # ── Idempotency: provision already in flight for this project ──
         in_progress = db.exec(
             select(ProvisionedNode).where(
                 ProvisionedNode.user_id == user_id,
@@ -394,7 +375,6 @@ class NodeProvisioner:
             logger.info("Node %s already provisioning for project %d — ignoring duplicate", brane_node, project_id)
             return ProvisionResult(brane_node=brane_node, status="ready")
 
-        # ── Node already running for a different project ──
         active = _find_active_node_for_user(user_id, db)
         if active:
             logger.info(
@@ -419,13 +399,11 @@ class NodeProvisioner:
             db.commit()
             return ProvisionResult(brane_node=brane_node, status="ready")
 
-        # ── New node: full provisioning ──
         try:
             ports = _allocate_ports(db)
-            working_dir = _BRANE_NODES_DIR / brane_node
+            working_dir = settings.brane_nodes_dir / brane_node
             working_dir.mkdir(parents=True, exist_ok=True)
 
-            # Reserve ports in DB immediately so concurrent provisions don't pick the same block
             row = ProvisionedNode(
                 user_id=user_id,
                 project_id=project_id,
@@ -445,17 +423,17 @@ class NodeProvisioner:
             _render_node_yml(working_dir, brane_node, ports)
             _copy_template_files(working_dir)
             _register_central_cert(brane_node)
-            _stop_node(brane_node)  # clear any stale containers from a previous session
+            _stop_node(brane_node)
             _start_node(working_dir)
             _health_check("localhost", ports)
             _patch_infra_yml(brane_node, ports)
-            _extend_brane_fwd(brane_node, ports)
+            if settings.WSL2_MODE:
+                _extend_brane_fwd(brane_node, ports)
             self._push_package(project_id, db)
 
             row.status = "ready"
             db.add(row)
 
-            # Upsert ParticipantNodeMap
             mapping = db.exec(
                 select(ParticipantNodeMap).where(ParticipantNodeMap.user_id == user_id)
             ).first()
@@ -470,12 +448,10 @@ class NodeProvisioner:
 
         except Exception as exc:
             logger.error("Provisioning failed for user %d project %d: %s", user_id, project_id, exc)
-            # Stop any containers that were started before the failure
             try:
                 _stop_node(brane_node)
             except Exception:
                 pass
-            # Remove the placeholder row so the port block isn't permanently reserved
             try:
                 stale = db.exec(
                     select(ProvisionedNode).where(
@@ -511,7 +487,6 @@ class NodeProvisioner:
         row.deprovisioned_at = datetime.now(timezone.utc)
         db.commit()
 
-        # Check whether other projects still use this node
         other_active = db.exec(
             select(ProvisionedNode).where(
                 ProvisionedNode.user_id == user_id,
@@ -526,7 +501,6 @@ class NodeProvisioner:
             )
             return
 
-        # Last project — full teardown
         try:
             _stop_node(brane_node)
             _remove_from_infra_yml(brane_node)
@@ -558,7 +532,7 @@ class NodeProvisioner:
 
         try:
             ports = _allocate_ports(db)
-            working_dir = _BRANE_NODES_DIR / brane_node
+            working_dir = settings.brane_nodes_dir / brane_node
             working_dir.mkdir(parents=True, exist_ok=True)
 
             row = CoordinatorNode(
@@ -579,11 +553,12 @@ class NodeProvisioner:
             _render_node_yml(working_dir, brane_node, ports)
             _copy_template_files(working_dir)
             _register_central_cert(brane_node)
-            _stop_node(brane_node)  # clear any stale containers from a previous session
+            _stop_node(brane_node)
             _start_node(working_dir)
             _health_check("localhost", ports)
             _patch_infra_yml(brane_node, ports)
-            _extend_brane_fwd(brane_node, ports)
+            if settings.WSL2_MODE:
+                _extend_brane_fwd(brane_node, ports)
             self._push_package(project_id, db)
 
             row.status = "ready"
@@ -665,19 +640,18 @@ class NodeProvisioner:
                     continue
             else:
                 logger.info("Reconcile: node %s is up", brane_node)
-            # Always re-extend brane-fwd — socat rules are wiped whenever brane-fwd is rebuilt
-            try:
-                _extend_brane_fwd(brane_node, ports)
-            except Exception as exc:
-                logger.warning("Reconcile: brane-fwd extend failed for %s: %s", brane_node, exc)
 
-        # Also ensure static nodes (worker1, worker2, alice, bob, etc.) are reachable.
-        # These are registered in infra.yml but not provisioned by the Integrator.
-        # Their socat rules are wiped on every brane-fwd restart and must be re-added.
-        try:
-            _extend_brane_fwd_static()
-        except Exception as exc:
-            logger.warning("Reconcile: static node brane-fwd extension failed: %s", exc)
+            if settings.WSL2_MODE:
+                try:
+                    _extend_brane_fwd(brane_node, ports)
+                except Exception as exc:
+                    logger.warning("Reconcile: brane-fwd extend failed for %s: %s", brane_node, exc)
+
+        if settings.WSL2_MODE:
+            try:
+                _extend_brane_fwd_static()
+            except Exception as exc:
+                logger.warning("Reconcile: static node brane-fwd extension failed: %s", exc)
 
     def _push_package(self, project_id: int, db: Session) -> None:
         src = db.exec(

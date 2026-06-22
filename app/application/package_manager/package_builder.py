@@ -60,7 +60,7 @@ class PackageBuilder:
         inside the container. Chown it to the brane user so the push HTTP handler can write."""
         try:
             container = settings.BRANE_API_CONTAINER or "brane-api"
-            packages_path = settings.BRANE_CENTRAL_PACKAGES_PATH or "/home/aditya/brane/nodes/central/packages"
+            packages_path = settings.brane_central_packages_path_resolved
             subprocess.run(
                 ["docker", "exec", "-u", "root", container, "chown", "brane:brane", packages_path],
                 capture_output=True, timeout=10,
