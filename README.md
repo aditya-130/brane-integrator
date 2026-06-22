@@ -89,18 +89,11 @@ You should see `brane-api`, `brane-drv`, `brane-plr`, and `brane-prx` containers
 
 ---
 
-## Template worker node
+## Node template (bundled certs and config)
 
-The node provisioner copies an existing worker node directory to create participant and coordinator nodes. You must create one template node before the Integrator can provision anything.
+The node provisioner creates participant and coordinator nodes by copying config and cert files from `brane-node-template/` in this repository. No pre-existing worker node is required — everything needed is shipped with the repo.
 
-```bash
-# Create a worker node called "worker1" (the default template name)
-branectl start worker --name worker1
-```
-
-This generates `$BRANE_NODES_DIR/worker1/` with the node config, certs, and data directories. The Integrator copies this directory for every new participant/coordinator it provisions.
-
-If you change the template node name, set `BRANE_TEMPLATE_NODE` in `.env`.
+**Important:** The certs in `brane-node-template/` are self-signed and shared across all provisioned nodes. They exist solely to satisfy Brane's TLS requirements in a local single-machine simulation. **Never use these certs in a production or multi-machine deployment** — each institution should generate its own certs with `branectl`.
 
 ---
 
@@ -165,7 +158,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | Variable | Default | Description |
 |---|---|---|
 | `WORKFLOW_GENERATION_STRATEGY` | `map_reduce` | `map_reduce` (deterministic) or `llm` |
-| `BRANE_TEMPLATE_NODE` | `worker1` | Template node name under `BRANE_NODES_DIR` |
+| `BRANE_CLI_PATH` | `brane` (from PATH) | Absolute path to the `brane` CLI binary |
 | `WSL2_MODE` | `false` | Set `true` on WSL2 — enables socat bridge and Docker Desktop PATH |
 | `EXECUTION_TIMEOUT_SECONDS` | `600` | Max seconds to wait for a workflow result |
 | `SQL_ECHO` | `false` | Log all SQL queries (debug only) |

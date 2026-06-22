@@ -17,7 +17,7 @@ ENV_FILE="${REPO_ROOT}/.env"
 # Read BRANE_NODES_DIR from .env if present, otherwise fall back to ~/brane/nodes
 BRANE_NODES="${HOME}/brane/nodes"
 if [[ -f "$ENV_FILE" ]]; then
-    val="$(grep -E '^BRANE_NODES_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")"
+    val="$(grep -E '^BRANE_NODES_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
     if [[ -n "$val" ]]; then
         BRANE_NODES="$val"
     fi

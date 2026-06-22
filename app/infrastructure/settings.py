@@ -30,14 +30,14 @@ class Settings(BaseSettings):
     BRANE_RESULTS_DIR: str = ""    # default: ~/brane/results
     BRANE_PACKAGES_DIR: str = ""   # default: ~/brane/packages (package build working dirs)
 
-    # Template node: certs, proxy.yml, backend.yml are copied from this node
-    # when provisioning new participant/coordinator nodes.
-    BRANE_TEMPLATE_NODE: str = "worker1"
-
     # Path to branelet binary used by "brane package build --init <path>".
     # Set this to bin/branelet (relative to the repo root) or an absolute path.
     # Leave empty to let Brane use its own bundled branelet.
     BRANELET_PATH: str = ""
+
+    # Path to the brane CLI binary used to run workflows.
+    # Leave empty to use "brane" from PATH.
+    BRANE_CLI_PATH: str = ""
 
     # Docker container name for brane-api (used to fix packages dir ownership)
     BRANE_API_CONTAINER: str = "brane-api"

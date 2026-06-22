@@ -1,4 +1,4 @@
-from app.application.prompts import (
+from app.application.utils.prompts import (
     BRANE_CONTEXT,
     BRANESCRIPT_CONSTRUCTS,
     NOTE_GENERATION_ROLE,

@@ -11,7 +11,7 @@ from sqlmodel import Session
 from app.application.node_provisioner.node_provisioner import NodeProvisioner
 from app.application.package_manager.package_builder import PackageBuilder
 from app.application.package_manager.package_generator import PackageGenerator
-from app.application.prompts import (
+from app.application.utils.prompts import (
     CONTAINER_YML_SCHEMA,
     CONTAINER_YML_SYSTEM,
     CONTAINER_YML_USER,

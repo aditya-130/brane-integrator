@@ -28,6 +28,7 @@ _HEALTH_TIMEOUT = 60
 _HEALTH_INTERVAL = 2
 
 _TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
+_NODE_TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent / "brane-node-template"
 
 # On WSL2, Docker Desktop places its CLI tools at a non-standard path.
 # _CMD_ENV extends PATH only when WSL2_MODE is enabled.
@@ -136,7 +137,7 @@ def _render_node_yml(working_dir: Path, brane_node: str, ports: PortBlock) -> No
 
 
 def _copy_template_files(working_dir: Path) -> None:
-    src = settings.brane_nodes_dir / settings.BRANE_TEMPLATE_NODE
+    src = _NODE_TEMPLATE_DIR / "worker-node"
     shutil.copytree(src / "certs", working_dir / "certs", dirs_exist_ok=True)
     for fname in ("proxy.yml", "backend.yml", "policies.db",
                   "policy_delib_secret.json", "policy_store_secret.json"):
@@ -145,13 +146,11 @@ def _copy_template_files(working_dir: Path) -> None:
 
 
 def _register_central_cert(brane_node: str) -> None:
-    src = settings.brane_nodes_dir / "central" / "certs" / settings.BRANE_TEMPLATE_NODE
+    src = _NODE_TEMPLATE_DIR / "central-certs"
     dst = settings.brane_nodes_dir / "central" / "certs" / brane_node
     dst.mkdir(parents=True, exist_ok=True)
     for fname in ("ca.pem", "client-id.pem"):
-        src_file = src / fname
-        if src_file.exists():
-            shutil.copy2(src_file, dst / fname)
+        shutil.copy2(src / fname, dst / fname)
     logger.info("Registered central cert for %s", brane_node)
 
 

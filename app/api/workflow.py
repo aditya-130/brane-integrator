@@ -5,7 +5,7 @@ from app.infrastructure.branehub_service import BraneHubService
 from app.infrastructure.database import get_db, engine
 from app.infrastructure.dtos import GenerateWorkflowRequest, RunWorkflowRequest, RejectWorkflowRequest, AbortWorkflowRequest, DismissedWorkflowRequest
 from app.infrastructure.llm_service import OpenAILlmService
-from app.application.workflow_job_handler import WorkflowJobHandler
+from app.application.workflow_generation.workflow_job_handler import WorkflowJobHandler
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import Session, select
 

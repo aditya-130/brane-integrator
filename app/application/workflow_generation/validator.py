@@ -11,7 +11,7 @@ from app.infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 from app.domain.config import IntegratorConfig
-from app.application.policy_interpreter import (
+from app.application.workflow_generation.policy_interpreter import (
     InterpretedWorkflow,
     PARTICIPANT_REGISTRY,
     PARTICIPANT_SKIP_FIELDS,
