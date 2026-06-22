@@ -43,6 +43,22 @@ A full **traceability report** is generated alongside every workflow, linking ea
 
 ## How the pipeline works
 
+When BraneHub triggers a workflow generation for a project, the Integrator runs through the following stages in sequence, all within a single background task:
+
+**1. Config parsing** — The raw project JSON from BraneHub is parsed into a structured `IntegratorConfig` object. This captures participant nodes, dataset names, the package to use, function names (local, combine, finalize), the coordinator node, and all policy fields.
+
+**2. Free-text extraction** — Policy fields like `privacy_legal_notes`, `data_provenance`, and `source_of_truth` often contain unstructured prose written by researchers. These are sent to an LLM in parallel (one call per field) to extract structured claims — for example `identifiability=PseudonymizedBySource` or `legal_basis=HIPAA TPO` — each with a confidence score. Low-confidence claims are discarded.
+
+**3. Policy interpretation** — Structured policy claims (from both typed fields and the free-text extraction above) are mapped to BraneScript constructs: `#[on("node")]` site annotations, `#[tag("key.value")]` per-call annotations, and `#![wf_tag("key.value")]` workflow-level tags. This follows the Kokash policy-to-construct framework.
+
+**4. BraneScript generation** — The interpreted policies and workflow config are passed to either the `TemplateGenerator` (deterministic map-reduce) or the `LlmGenerator` (GPT-4o with validate-and-retry). Both produce a complete, runnable BraneScript.
+
+**5. Package push + validation** — The package is pushed to the Brane central registry so the validator can query the GraphQL API to confirm function names exist. Then the 9-rule structural validator checks the BraneScript for correctness. A traceability report is generated, linking every annotation back to the policy source that produced it.
+
+**6. Upload to BraneHub** — The validated script and traceability report are uploaded to BraneHub. The workflow enters `generated` status and awaits researcher approval.
+
+**7. Execution** — When the researcher approves in BraneHub, a run callback arrives. The Integrator strips tag annotations (eFLINT bug workaround), writes the script to a temp file, and runs it via `brane workflow run`. The result is parsed and posted back to BraneHub as a completion callback.
+
 **Module layout:**
 
 | Path | Purpose |
