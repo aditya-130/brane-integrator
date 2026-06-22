@@ -77,6 +77,7 @@ When BraneHub triggers a workflow generation for a project, the Integrator runs 
 | `app/templates/` | `node.yml.j2` — Jinja2 template rendered per provisioned node |
 | `brane-node-template/` | Bundled TLS certs and worker config copied when provisioning nodes |
 | `scripts/reset.sh` | Full teardown — wipes all managed nodes and databases |
+| `examples/` | Example package (`cancer_avg_package.py`) and LLM generation prompt (`cancer_avg_prompt.txt`) |
 
 ---
 
@@ -158,6 +159,19 @@ The Integrator supports the **federated map-reduce** pattern only. This covers a
 A Brane package is a Python file executed inside a Docker container. The Integrator can generate packages via LLM (Path A/B in the admin dashboard), but if you write one manually these are the rules that must be followed exactly.
 
 A complete, working example is at [`examples/cancer_avg_package.py`](examples/cancer_avg_package.py). It computes per-cancer-type average age federated across multiple sites.
+
+### Generating a package with the LLM
+
+Instead of writing the package by hand, you can describe your computation in plain English and let the Integrator generate the Python code and `container.yml`.
+
+The prompt needs to specify:
+- **Study objective** — what the overall computation achieves
+- **Data structure** — what columns/fields are in the dataset
+- **Local function behaviour** — what each participant computes on their local data and what structure it returns
+- **Combine function behaviour** — how two partial results are merged (must be an accumulator — same output structure as local, no final division)
+- **Finalize function behaviour** — how the accumulated result is converted into the final answer
+
+See [`examples/cancer_avg_prompt.txt`](examples/cancer_avg_prompt.txt) for a worked example of a well-formed generation prompt.
 
 ### The three required functions
 

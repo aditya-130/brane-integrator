@@ -1,0 +1,14 @@
+Study objective:
+  Compute the average age of cancer diagnosis per cancer type across multiple hospitals
+
+Computation description:
+  Each hospital has a CSV file with columns: patient_id, age, cancer_type, gender, stage, diagnosis_date.
+
+  For each hospital, group patients by cancer_type and compute the count and sum of ages per group.
+  The coordinator should merge these partial statistics across all hospitals and compute the final
+  mean age per cancer type by dividing the total age sum by the total count.
+
+  The local function should return a dict of {cancer_type: {count: N, age_sum: S}}.
+  The combine function must return the same structure — do not compute the mean inside combine,
+  only accumulate the sums and counts so it works correctly for any number of hospitals.
+  The finalize function divides age_sum by count per cancer type to produce the final mean ages.
