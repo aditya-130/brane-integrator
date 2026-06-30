@@ -24,7 +24,7 @@ def compute_metrics(mappings):
 
     # M1.2: construct-generating entries / flagged entries
     construct_to_flag = (
-        round(len(construct_generating) / len(flagged), 4) if flagged else float("inf")
+        round(len(construct_generating) / len(flagged), 4) if flagged else None
     )
 
     # M1.4: of construct-generating entries, fraction with a line number
@@ -145,7 +145,7 @@ def main():
 
     # Aggregate across all 8 scenarios
     all_coverage = [v["coverage_rate"] for v in per_scenario.values()]
-    all_cf_ratio = [v["construct_to_flag_ratio"] for v in per_scenario.values() if v["construct_to_flag_ratio"] != float("inf")]
+    all_cf_ratio = [v["construct_to_flag_ratio"] for v in per_scenario.values() if v["construct_to_flag_ratio"] is not None]
     all_lv = [v["line_verifiability_rate"] for v in per_scenario.values()]
 
     output = {
