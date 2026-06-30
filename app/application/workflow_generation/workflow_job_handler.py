@@ -129,6 +129,7 @@ class WorkflowJobHandler:
         workflow.generation_strategy = pattern
         workflow.llm_calls_made = llm_calls
         workflow.regeneration_count = regeneration_count
+        workflow.generated_at = datetime.now(timezone.utc)
         workflow.status = "generated"
         self.db.add(workflow)
         self.db.commit()
