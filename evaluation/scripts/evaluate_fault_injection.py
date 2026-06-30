@@ -21,7 +21,7 @@ EXPECTED = {
     "FI-6.bs":  ["tag_annotation_participant-1"],
     "FI-7.bs":  ["dataset_ref_participant-1", "dataset_ref_participant-3"],
     "FI-8.bs":  ["combine_exactly_two_args"],
-    "FI-9.bs":  ["package_registered"],
+    "FI-9.bs":  ["package_registered", "function_registered"],
     "FI-10.bs": ["on_annotation_participant-3", "tag_annotation_participant-1"],
 }
 

@@ -1,0 +1,119 @@
+{
+  "summary": {
+    "total": 10,
+    "caught": 10,
+    "missed": 0
+  },
+  "catch_rate": 1.0,
+  "results": [
+    {
+      "file": "FI-1.bs",
+      "expected_rules": [
+        "import_present"
+      ],
+      "failed_rules": [
+        "import_present"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-10.bs",
+      "expected_rules": [
+        "on_annotation_participant-3",
+        "tag_annotation_participant-1"
+      ],
+      "failed_rules": [
+        "on_annotation_participant-3",
+        "tag_annotation_participant-1",
+        "tag_annotation_participant-3"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-2.bs",
+      "expected_rules": [
+        "return_present"
+      ],
+      "failed_rules": [
+        "return_present"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-3.bs",
+      "expected_rules": [
+        "on_annotation_participant-3"
+      ],
+      "failed_rules": [
+        "on_annotation_participant-3",
+        "tag_annotation_participant-3"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-4.bs",
+      "expected_rules": [
+        "combine_pinned_to_coordinator"
+      ],
+      "failed_rules": [
+        "combine_pinned_to_coordinator"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-5.bs",
+      "expected_rules": [
+        "wf_tag_present"
+      ],
+      "failed_rules": [
+        "wf_tag_present",
+        "wf_tag_present",
+        "wf_tag_present"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-6.bs",
+      "expected_rules": [
+        "tag_annotation_participant-1"
+      ],
+      "failed_rules": [
+        "tag_annotation_participant-1"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-7.bs",
+      "expected_rules": [
+        "dataset_ref_participant-1",
+        "dataset_ref_participant-3"
+      ],
+      "failed_rules": [
+        "dataset_ref_participant-1",
+        "dataset_ref_participant-3"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-8.bs",
+      "expected_rules": [
+        "combine_exactly_two_args"
+      ],
+      "failed_rules": [
+        "combine_exactly_two_args"
+      ],
+      "caught": true
+    },
+    {
+      "file": "FI-9.bs",
+      "expected_rules": [
+        "package_registered",
+        "function_registered"
+      ],
+      "failed_rules": [
+        "function_registered_run_analysis"
+      ],
+      "caught": true
+    }
+  ]
+}
