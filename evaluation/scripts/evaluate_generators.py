@@ -6,6 +6,9 @@ import time
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 os.environ.setdefault("BRANE_INTEGRATOR_API_KEY", "eval")
 
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+
 from app.domain.config import IntegratorConfig, ProjectBlock, WorkflowSpec, ParticipantPolicy
 from app.application.workflow_generation.policy_interpreter import PolicyInterpreter
 from app.application.workflow_generation.strategy.template_generator import TemplateGenerator
@@ -118,6 +121,8 @@ def run_llm(config, interpreted, llm_service, container_yml=None):
 
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
+    scripts_dir = os.path.join(RESULTS_DIR, "generated_scripts")
+    os.makedirs(scripts_dir, exist_ok=True)
 
     has_llm = bool(os.environ.get("OPENAI_API_KEY"))
     if not has_llm:
@@ -144,6 +149,8 @@ def main():
         template_validity.append(1 if t_passed else 0)
         template_latencies.append(t_latency)
         print(f"  Template: passed={t_passed} latency={t_latency}ms")
+        with open(os.path.join(scripts_dir, f"s{scenario_id}_template.bs"), "w") as f:
+            f.write(t_script)
 
         scenario_result = {
             "template": {"passed": t_passed, "latency_ms": t_latency},
@@ -180,6 +187,9 @@ def main():
             jaccards.append(avg_jac)
 
             print(f"  LLM: first_pass={first_pass_rate} latency={avg_latency}ms calls={avg_calls} regen={avg_regen} jaccard={avg_jac}")
+
+            with open(os.path.join(scripts_dir, f"s{scenario_id}_llm_run1.bs"), "w") as f:
+                f.write(run_scripts[0])
 
             scenario_result["llm"] = {
                 "first_pass_rate": first_pass_rate,

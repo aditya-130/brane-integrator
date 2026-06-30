@@ -1,0 +1,39 @@
+import fed_mean;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.consent")]
+#![wf_tag("jurisdiction.EU")]
+
+let data_1 := new Data { name := "cancer_age_s4_p1" };
+let data_2 := new Data { name := "cancer_age_s4_p3" };
+let data_3 := new Data { name := "cancer_age_s4_p5" };
+let data_4 := new Data { name := "cancer_age_s4_p7" };
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := compute_local(data_1);
+
+#[on("participant-3")]
+#[tag("identifiability.Anonymized")]
+let stats_2 := compute_local(data_2);
+
+#[on("participant-5")]
+#[tag("identifiability.Pseudonymized")]
+let stats_3 := compute_local(data_3);
+
+#[on("participant-7")]
+#[tag("identifiability.Anonymized")]
+let stats_4 := compute_local(data_4);
+
+#[on("coordinator-4")]
+let acc_0 := combine_results(stats_1, stats_2);
+#[on("coordinator-4")]
+let acc_1 := combine_results(acc_0, stats_3);
+#[on("coordinator-4")]
+let acc_2 := combine_results(acc_1, stats_4);
+let result := acc_2;
+
+#[on("coordinator-4")]
+let final_result := finalize(result);
+
+return final_result;
