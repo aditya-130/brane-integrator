@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "project_id": 6,
+  "project": {
+    "title": "FedCancer S6: Free-Text Heavy",
+    "type": "FDP",
+    "status": "open",
+    "fdp_config": {
+      "study_objective": "Compute federated mean age by cancer type — rich free-text governance notes per participant",
+      "data_sensitivity_level": "High",
+      "legal_basis_for_processing": "consent",
+      "security_measures_planned": ["encryption_at_rest"],
+      "result_sharing_policy": "Aggregated statistics only",
+      "participant_responsibilities": "Keep local patient CSV on local nodes",
+      "third_party_collaboration": null
+    }
+  },
+  "accepted_participants": [
+    {
+      "user_id": 1,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s6_p1" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["EU"],
+        "identifiability.processingLevel": "Pseudonymized",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "Yes",
+        "ethicalLegal.irbApproval": "Yes",
+        "identifiability.directIdentifiers": "No",
+        "identifiability.quasiIdentifiers": "Yes",
+        "securityInfrastructure.auditLoggingRequired": "Yes",
+        "securityInfrastructure.networkConnectionPolicy": "ProxyOnly",
+        "securityInfrastructure.securityCertifications": ["ISO27001"],
+        "dataGovernance.agreementsExist": "Yes",
+        "dataGovernance.modelUpdatesAllowed": "No",
+        "dataGovernance.requiresPerRoundApproval": "No",
+        "retentionRevocation.requiresUnlearning": "No"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "All patient records have been pseudonymized by our hospital IT department using a one-way hash. The mapping table is held in a separate air-gapped environment and is not accessible to this project. All participants provided written informed consent prior to data collection.",
+        "meta.provenance": "Data originates from our oncology department's electronic health record system. Records span 2018-2024 and cover all cancer diagnoses made at this institution during that period.",
+        "storage.source_of_truth": "The canonical dataset is stored in our hospital's internal data warehouse under access control policies governed by the data protection officer."
+      }
+    },
+    {
+      "user_id": 3,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s6_p3" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["EU"],
+        "identifiability.processingLevel": "Anonymized",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "Yes",
+        "ethicalLegal.irbApproval": "Yes",
+        "identifiability.directIdentifiers": "No",
+        "identifiability.quasiIdentifiers": "No",
+        "securityInfrastructure.auditLoggingRequired": "Yes",
+        "securityInfrastructure.networkConnectionPolicy": "DirectOnly",
+        "securityInfrastructure.securityCertifications": ["ISO27001"],
+        "dataGovernance.agreementsExist": "Yes",
+        "dataGovernance.modelUpdatesAllowed": "No",
+        "dataGovernance.requiresPerRoundApproval": "No",
+        "retentionRevocation.requiresUnlearning": "No"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "This dataset has been fully anonymized according to HIPAA Safe Harbor requirements. All 18 identifier categories have been removed and verified by our data governance team. The data carries high sensitivity due to the nature of oncology diagnoses.",
+        "meta.provenance": "Records collected as part of routine clinical care at our cancer center between 2019 and 2023. Data was extracted and anonymized by our research data team under IRB protocol 2023-0892.",
+        "storage.source_of_truth": "Primary storage is our institution's research data repository, governed under our data sharing agreement with the research consortium."
+      }
+    }
+  ]
+}
