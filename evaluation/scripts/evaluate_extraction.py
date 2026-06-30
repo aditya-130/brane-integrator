@@ -7,6 +7,9 @@ import re
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 os.environ.setdefault("BRANE_INTEGRATOR_API_KEY", "eval")
 
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+
 from app.domain.config import IntegratorConfig, ProjectBlock, WorkflowSpec, ParticipantPolicy
 from app.application.workflow_generation.free_text_extractor import FreeTextExtractor
 from app.infrastructure.llm_service import OpenAILlmService
@@ -97,7 +100,9 @@ def main():
 
     log_capture = ConfidenceLogCapture()
     log_capture.setLevel(logging.INFO)
-    logging.getLogger("app.application.workflow_generation.free_text_extractor").addHandler(log_capture)
+    fte_logger = logging.getLogger("app.application.workflow_generation.free_text_extractor")
+    fte_logger.setLevel(logging.INFO)
+    fte_logger.addHandler(log_capture)
 
     all_precisions, all_recalls, all_f1s, all_jaccards = [], [], [], []
     per_entry = []
