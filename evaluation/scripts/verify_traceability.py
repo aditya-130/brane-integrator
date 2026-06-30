@@ -6,7 +6,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 os.environ.setdefault("BRANE_INTEGRATOR_API_KEY", "eval")
 
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "../results")
-PROJECT_125_PATH = os.path.join(RESULTS_DIR, "project_125_full_record.json")
 
 
 def compute_metrics(mappings):
@@ -42,16 +41,6 @@ def compute_metrics(mappings):
         "construct_to_flag_ratio": construct_to_flag,
         "line_verifiability_rate": line_verifiability,
     }
-
-
-def analyse_project_125():
-    if not os.path.exists(PROJECT_125_PATH):
-        print(f"  SKIP: {PROJECT_125_PATH} not found — export it from the live system first")
-        return None
-    with open(PROJECT_125_PATH) as f:
-        record = json.load(f)
-    mappings = record["traceability_report"]["mappings"]
-    return compute_metrics(mappings)
 
 
 def analyse_scenarios():
@@ -151,27 +140,31 @@ def analyse_scenarios():
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    print("Analysing project 125...")
-    p125 = analyse_project_125()
-    if p125:
-        print(f"  {p125}")
-
     print("Analysing scenarios S1-S8...")
     per_scenario = analyse_scenarios()
 
+    # Aggregate across all 8 scenarios
+    all_coverage = [v["coverage_rate"] for v in per_scenario.values()]
+    all_cf_ratio = [v["construct_to_flag_ratio"] for v in per_scenario.values() if v["construct_to_flag_ratio"] != float("inf")]
+    all_lv = [v["line_verifiability_rate"] for v in per_scenario.values()]
+
     output = {
-        "project_125": p125,
         "per_scenario": per_scenario,
+        "aggregate": {
+            "avg_coverage_rate": round(sum(all_coverage) / len(all_coverage), 4),
+            "avg_construct_to_flag_ratio": round(sum(all_cf_ratio) / len(all_cf_ratio), 4) if all_cf_ratio else None,
+            "avg_line_verifiability_rate": round(sum(all_lv) / len(all_lv), 4),
+        },
     }
 
     out_path = os.path.join(RESULTS_DIR, "traceability_metrics.json")
     with open(out_path, "w") as f:
         json.dump(output, f, indent=2)
 
-    if p125:
-        print(f"\nM1.1 coverage_rate (p125):          {p125['coverage_rate']}")
-        print(f"M1.2 construct_to_flag_ratio (p125): {p125['construct_to_flag_ratio']}")
-        print(f"M1.4 line_verifiability_rate (p125): {p125['line_verifiability_rate']}")
+    agg = output["aggregate"]
+    print(f"\nM1.1 avg coverage_rate:          {agg['avg_coverage_rate']}")
+    print(f"M1.2 avg construct_to_flag_ratio: {agg['avg_construct_to_flag_ratio']}")
+    print(f"M1.4 avg line_verifiability_rate: {agg['avg_line_verifiability_rate']}")
     print(f"Written: {out_path}")
 
 
