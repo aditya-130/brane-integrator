@@ -1,0 +1,32 @@
+import fed_kmeans;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.consent")]
+#![wf_tag("jurisdiction.EU")]
+
+let data_1 := new Data { name := "kmeans_data_p1" };
+let data_2 := new Data { name := "kmeans_data_p3" };
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let r1_local_1 := compute_assignments(data_1, "initial_centroids");
+
+#[on("participant-3")]
+#[tag("identifiability.Anonymized")]
+let r1_local_2 := compute_assignments(data_2, "initial_centroids");
+
+#[on("coordinator-1")]
+let global_r1 := aggregate_and_update(r1_local_1, r1_local_2);
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let r2_local_1 := compute_assignments(data_1, global_r1);
+
+#[on("participant-3")]
+#[tag("identifiability.Anonymized")]
+let r2_local_2 := compute_assignments(data_2, global_r1);
+
+#[on("coordinator-1")]
+let result := aggregate_and_update(r2_local_1, r2_local_2);
+
+return result;
