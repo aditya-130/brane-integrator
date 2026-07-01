@@ -1,0 +1,79 @@
+{
+  "pkg_1": {
+    "template": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 38344
+    },
+    "llm": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 35334
+    }
+  },
+  "pkg_2": {
+    "template": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 35099
+    },
+    "llm": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 30544
+    }
+  },
+  "pkg_3": {
+    "template": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 35637
+    },
+    "llm": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 32451
+    }
+  },
+  "pkg_4": {
+    "template": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 36364
+    },
+    "llm": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": true,
+      "latency_ms": 287435
+    }
+  },
+  "pkg_5": {
+    "template": {
+      "branescript_generated": true,
+      "execution_success": true,
+      "numerical_match": null,
+      "latency_ms": 11874,
+      "note": "pkg_5: single-participant result vs pooled baseline \u2014 intentional mismatch",
+      "live_result": {
+        "sum": 5029.0165,
+        "count": 50,
+        "mean": 100.5803
+      }
+    },
+    "llm": {
+      "branescript_generated": true,
+      "execution_success": false,
+      "numerical_match": false,
+      "latency_ms": 108,
+      "error": "/tmp/tmpc52s37iu.bs:10:15: error: Undefined function or method 'combine_results'\n 10 | let result := combine_results(stats_1, stats_1);\n    |               ^^^^^^^^^^^^^^^\n\nERROR: Compilation of workflow failed (see output above)"
+    }
+  }
+}

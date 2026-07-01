@@ -1,0 +1,151 @@
+{
+  "schema_valid_rate": 1.0,
+  "avg_type_accuracy": 1.0,
+  "numerical_match_rate": 0.8,
+  "per_package": {
+    "pkg_1": {
+      "package": "pkg_1",
+      "schema_valid": true,
+      "type_accuracy": 1.0,
+      "numerical_match": true,
+      "brane_e2e": {
+        "success": false,
+        "latency_ms": 1118
+      },
+      "type_details": {
+        "compute_local": {
+          "correct": true,
+          "expected": {
+            "input": "Data",
+            "output": "String"
+          }
+        },
+        "combine_results": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        },
+        "finalize": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        }
+      },
+      "numerical_match_reason": "equal"
+    },
+    "pkg_2": {
+      "package": "pkg_2",
+      "schema_valid": true,
+      "type_accuracy": 1.0,
+      "numerical_match": true,
+      "brane_e2e": null,
+      "type_details": {
+        "compute_local": {
+          "correct": true,
+          "expected": {
+            "input": "Data",
+            "output": "String"
+          }
+        },
+        "combine_results": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        },
+        "finalize": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        }
+      },
+      "numerical_match_reason": "equal"
+    },
+    "pkg_3": {
+      "package": "pkg_3",
+      "schema_valid": true,
+      "type_accuracy": 1.0,
+      "numerical_match": true,
+      "brane_e2e": null,
+      "type_details": {
+        "compute_local": {
+          "correct": true,
+          "expected": {
+            "input": "Data",
+            "output": "String"
+          }
+        },
+        "combine_results": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        },
+        "finalize": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        }
+      },
+      "numerical_match_reason": "equal"
+    },
+    "pkg_4": {
+      "package": "pkg_4",
+      "schema_valid": true,
+      "type_accuracy": 1.0,
+      "numerical_match": true,
+      "brane_e2e": null,
+      "type_details": {
+        "compute_local": {
+          "correct": true,
+          "expected": {
+            "input": "Data",
+            "output": "String"
+          }
+        },
+        "combine_results": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        },
+        "finalize": {
+          "correct": true,
+          "expected": {
+            "input": "String",
+            "output": "String"
+          }
+        }
+      },
+      "numerical_match_reason": "equal"
+    },
+    "pkg_5": {
+      "package": "pkg_5",
+      "schema_valid": true,
+      "type_accuracy": 1.0,
+      "numerical_match": false,
+      "brane_e2e": null,
+      "type_details": {
+        "compute_local": {
+          "correct": true,
+          "expected": {
+            "input": "Data",
+            "output": "String"
+          }
+        }
+      },
+      "numerical_match_reason": "key 'sum': numeric diff: 5029.0165 vs 10265.698 (tol=1e-06)"
+    }
+  }
+}

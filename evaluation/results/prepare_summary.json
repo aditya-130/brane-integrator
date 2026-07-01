@@ -1,0 +1,47 @@
+{
+  "pkg_1": {
+    "brane_name": "fed_mean",
+    "package_built": true,
+    "datasets_registered": true,
+    "m4_6_schema_valid": true,
+    "m4_5_type_accuracy": 1.0,
+    "template_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_1_template.bs",
+    "llm_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_1_llm.bs"
+  },
+  "pkg_2": {
+    "brane_name": "fed_logreg",
+    "package_built": true,
+    "datasets_registered": true,
+    "m4_6_schema_valid": true,
+    "m4_5_type_accuracy": 1.0,
+    "template_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_2_template.bs",
+    "llm_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_2_llm.bs"
+  },
+  "pkg_3": {
+    "brane_name": "fed_histogram",
+    "package_built": true,
+    "datasets_registered": true,
+    "m4_6_schema_valid": true,
+    "m4_5_type_accuracy": 1.0,
+    "template_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_3_template.bs",
+    "llm_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_3_llm.bs"
+  },
+  "pkg_4": {
+    "brane_name": "fed_variance",
+    "package_built": true,
+    "datasets_registered": true,
+    "m4_6_schema_valid": true,
+    "m4_5_type_accuracy": 1.0,
+    "template_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_4_template.bs",
+    "llm_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_4_llm.bs"
+  },
+  "pkg_5": {
+    "brane_name": "fed_single",
+    "package_built": true,
+    "datasets_registered": true,
+    "m4_6_schema_valid": true,
+    "m4_5_type_accuracy": 1.0,
+    "template_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_5_template.bs",
+    "llm_script": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated/pkg_5_llm.bs"
+  }
+}
