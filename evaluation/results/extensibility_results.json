@@ -63,7 +63,7 @@
             "score": "3/3"
           }
         },
-        "latency_ms": 9521
+        "latency_ms": 6703
       },
       {
         "run": 2,
@@ -94,7 +94,7 @@
             "score": "3/3"
           }
         },
-        "latency_ms": 4708
+        "latency_ms": 6593
       },
       {
         "run": 3,
@@ -125,11 +125,11 @@
             "score": "3/3"
           }
         },
-        "latency_ms": 3536
+        "latency_ms": 5767
       }
     ],
     "avg_structural_score": 3.0,
-    "llm_jaccard_consistency": 0.8667,
-    "template_vs_llm_jaccard": 0.5455
+    "llm_jaccard_consistency": 0.6217,
+    "template_vs_llm_jaccard": 0.4783
   }
 }

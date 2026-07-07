@@ -1,0 +1,23 @@
+name: pkg_5_eval
+version: 1.0.0
+kind: ecu
+base: python:3.10-slim
+contributors:
+  - name: Brane Integrator
+entrypoint:
+  kind: task
+  exec: run.sh
+files:
+  - pkg_5_eval.py
+  - run.sh
+actions:
+  compute_local:
+    command:
+      args:
+        - compute_local
+    input:
+      - name: local_data
+        type: Data
+    output:
+      - name: output
+        type: string

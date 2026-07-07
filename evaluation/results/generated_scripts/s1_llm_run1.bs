@@ -16,9 +16,9 @@ let stats_1 := compute_local(data_1);
 let stats_2 := compute_local(data_2);
 
 #[on("coordinator-1")]
-let combined_stats := combine_results(stats_1, stats_2);
+let combined_0 := combine_results(stats_1, stats_2);
 
 #[on("coordinator-1")]
-let final_result := finalize(combined_stats);
+let result := finalize(combined_0);
 
-return final_result;
+return result;

@@ -1,0 +1,45 @@
+name: pkg_4_eval
+version: 1.0.0
+kind: ecu
+base: python:3.10-slim
+contributors:
+  - name: Federated Variance Integrator
+entrypoint:
+  kind: task
+  exec: run.sh
+files:
+  - pkg_4_eval.py
+  - run.sh
+actions:
+  compute_local:
+    command:
+      args:
+        - compute_local
+    input:
+      - name: local_data
+        type: Data
+    output:
+      - name: output
+        type: string
+  combine_results:
+    command:
+      args:
+        - combine_results
+    input:
+      - name: result_1
+        type: string
+      - name: result_2
+        type: string
+    output:
+      - name: output
+        type: string
+  finalize:
+    command:
+      args:
+        - finalize
+    input:
+      - name: accumulator
+        type: string
+    output:
+      - name: output
+        type: string

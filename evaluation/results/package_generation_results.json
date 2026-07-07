@@ -1,0 +1,1043 @@
+{
+  "summary": {
+    "m4_6_schema_valid_rate": 1.0,
+    "m4_5_avg_type_accuracy": 1.0,
+    "m4_5_hallucination_rate": 0.16,
+    "m4_2_accumulator_contract_rate": 1.0,
+    "m4_12_numerical_match_rate_all_5_packages": 0.56,
+    "m4_12_numerical_match_rate_excl_pkg5": 0.7,
+    "m4_13_python_jaccard": 0.3979,
+    "m4_14_container_yml_jaccard": 0.9214,
+    "note_pkg_5": "pkg_5 has no combine/finalize by design, but PACKAGE_GENERATOR_SYSTEM prompt mandates generating all three functions -- expected to show up as hallucinated_actions in m4_5_type_report and possibly affect m4_12 numerical_match. Documented limitation, not a bug. See FINDINGS.md.",
+    "build_attempted": true,
+    "m4_4_build_success_rate": 1.0,
+    "m4_4_push_success_rate": 1.0,
+    "m4_12_root_cause_breakdown": {
+      "total_runs_excl_pkg5": 20,
+      "raw_strict_matches": 14,
+      "measurement_artifact_failures": 3,
+      "genuine_llm_bugs": 2,
+      "spec_deviations": 1,
+      "adjusted_correctness_rate": 0.85,
+      "note": "adjusted_correctness_rate excludes measurement_artifact failures (baseline rounding gaps not present in the generated code) from the failure count -- genuine_llm_bugs and spec_deviations remain counted as failures."
+    }
+  },
+  "packages": {
+    "pkg_1": {
+      "brane_name": "fed_mean",
+      "n_runs": 5,
+      "n_generation_failures": 0,
+      "m4_6_schema_valid_rate": 1.0,
+      "m4_5_avg_type_accuracy": 1.0,
+      "m4_5_hallucination_rate": 0.0,
+      "m4_2_accumulator_contract_rate": 1.0,
+      "m4_12_numerical_match_rate": 0.4,
+      "m4_13_python_jaccard": 0.2853,
+      "m4_14_container_yml_jaccard": 1.0,
+      "runs": [
+        {
+          "run": 1,
+          "package_name": "pkg_1_eval",
+          "python_filename": "pkg_1_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run1.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run1.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "Lung": {
+                "mean_age": 56.73888888888889
+              },
+              "Prostate": {
+                "mean_age": 58.8375
+              },
+              "Colorectal": {
+                "mean_age": 52.49166666666667
+              },
+              "Melanoma": {
+                "mean_age": 60.85999999999999
+              },
+              "Breast": {
+                "mean_age": 61.52
+              },
+              "Leukemia": {
+                "mean_age": 63.89000000000001
+              },
+              "Lymphoma": {
+                "mean_age": 60.74444444444445
+              },
+              "Pancreatic": {
+                "mean_age": 63.19999999999999
+              }
+            },
+            "numerical_match_reason": "Lung: diff=0.0011111111111148375",
+            "root_cause_category": "measurement_artifact",
+            "root_cause_explanation": "Baseline rounds finalize to 2dp (round(x,2)); description did not ask generated code to round. Generated returns full-precision float; diff (~0.0011) is entirely the rounding gap, not a computation error."
+          }
+        },
+        {
+          "run": 2,
+          "package_name": "pkg_1_eval",
+          "python_filename": "pkg_1_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run2.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run2.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "Lung": {
+                "mean_age": 56.74
+              },
+              "Prostate": {
+                "mean_age": 58.84
+              },
+              "Colorectal": {
+                "mean_age": 52.49
+              },
+              "Melanoma": {
+                "mean_age": 60.86
+              },
+              "Breast": {
+                "mean_age": 61.52
+              },
+              "Leukemia": {
+                "mean_age": 63.89
+              },
+              "Lymphoma": {
+                "mean_age": 60.74
+              },
+              "Pancreatic": {
+                "mean_age": 63.2
+              }
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 3,
+          "package_name": "pkg_1_eval",
+          "python_filename": "pkg_1_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run3.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run3.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "Lung": {
+                "mean_age": 56.73888888888889
+              },
+              "Prostate": {
+                "mean_age": 58.8375
+              },
+              "Colorectal": {
+                "mean_age": 52.49166666666667
+              },
+              "Melanoma": {
+                "mean_age": 60.85999999999999
+              },
+              "Breast": {
+                "mean_age": 61.52
+              },
+              "Leukemia": {
+                "mean_age": 63.89000000000001
+              },
+              "Lymphoma": {
+                "mean_age": 60.74444444444445
+              },
+              "Pancreatic": {
+                "mean_age": 63.19999999999999
+              }
+            },
+            "numerical_match_reason": "Lung: diff=0.0011111111111148375",
+            "root_cause_category": "measurement_artifact",
+            "root_cause_explanation": "Same as run 1 -- unrounded finalize output vs 2dp-rounded baseline."
+          }
+        },
+        {
+          "run": 4,
+          "package_name": "pkg_1_eval",
+          "python_filename": "pkg_1_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run4.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run4.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "Colorectal": {
+                "mean_age": 52.49166666666667
+              },
+              "Lymphoma": {
+                "mean_age": 60.74444444444445
+              },
+              "Melanoma": {
+                "mean_age": 60.85999999999999
+              },
+              "Leukemia": {
+                "mean_age": 63.89000000000001
+              },
+              "Pancreatic": {
+                "mean_age": 63.19999999999999
+              },
+              "Lung": {
+                "mean_age": 56.73888888888889
+              },
+              "Prostate": {
+                "mean_age": 58.8375
+              },
+              "Breast": {
+                "mean_age": 61.52
+              }
+            },
+            "numerical_match_reason": "Colorectal: diff=0.0016666666666651508",
+            "root_cause_category": "measurement_artifact",
+            "root_cause_explanation": "Same as run 1 -- unrounded finalize output vs 2dp-rounded baseline."
+          }
+        },
+        {
+          "run": 5,
+          "package_name": "pkg_1_eval",
+          "python_filename": "pkg_1_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run5.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_1_run5.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "Melanoma": {
+                "mean_age": 60.86
+              },
+              "Colorectal": {
+                "mean_age": 52.49
+              },
+              "Lung": {
+                "mean_age": 56.74
+              },
+              "Leukemia": {
+                "mean_age": 63.89
+              },
+              "Prostate": {
+                "mean_age": 58.84
+              },
+              "Breast": {
+                "mean_age": 61.52
+              },
+              "Lymphoma": {
+                "mean_age": 60.74
+              },
+              "Pancreatic": {
+                "mean_age": 63.2
+              }
+            },
+            "numerical_match_reason": null
+          }
+        }
+      ],
+      "m4_4_build": {
+        "built": true,
+        "pushed": true,
+        "image_name": "pkg_1_eval."
+      }
+    },
+    "pkg_2": {
+      "brane_name": "fed_logreg",
+      "n_runs": 5,
+      "n_generation_failures": 0,
+      "m4_6_schema_valid_rate": 1.0,
+      "m4_5_avg_type_accuracy": 1.0,
+      "m4_5_hallucination_rate": 0.0,
+      "m4_2_accumulator_contract_rate": 1.0,
+      "m4_12_numerical_match_rate": 0.8,
+      "m4_13_python_jaccard": 0.3433,
+      "m4_14_container_yml_jaccard": 1.0,
+      "runs": [
+        {
+          "run": 1,
+          "package_name": "pkg_2_eval",
+          "python_filename": "pkg_2_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run1.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run1.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "weights": [
+                -0.0034027067193894995
+              ],
+              "n_samples": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 2,
+          "package_name": "pkg_2_eval",
+          "python_filename": "pkg_2_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run2.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run2.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "weights": [
+                0.0034027067193894995
+              ],
+              "n_samples": 100
+            },
+            "numerical_match_reason": "weights: [0]: diff=0.006805413438778999",
+            "root_cause_category": "genuine_llm_bug",
+            "root_cause_explanation": "finalize computes weights = +lr*(gradient/n) instead of the correct -lr*(gradient/n) -- missing negative sign in the gradient descent step. Diff (0.0068) = exactly 2x the correct weight magnitude, consistent with a sign flip."
+          }
+        },
+        {
+          "run": 3,
+          "package_name": "pkg_2_eval",
+          "python_filename": "pkg_2_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run3.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run3.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "weights": [
+                -0.0034027067193894995
+              ],
+              "n_samples": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 4,
+          "package_name": "pkg_2_eval",
+          "python_filename": "pkg_2_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run4.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run4.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "weights": [
+                -0.0034027067193894995
+              ],
+              "n_samples": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 5,
+          "package_name": "pkg_2_eval",
+          "python_filename": "pkg_2_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run5.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_2_run5.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "weights": [
+                -0.0034027067193894995
+              ],
+              "n_samples": 100
+            },
+            "numerical_match_reason": null
+          }
+        }
+      ],
+      "m4_4_build": {
+        "built": true,
+        "pushed": true,
+        "image_name": "pkg_2_eval."
+      }
+    },
+    "pkg_3": {
+      "brane_name": "fed_histogram",
+      "n_runs": 5,
+      "n_generation_failures": 0,
+      "m4_6_schema_valid_rate": 1.0,
+      "m4_5_avg_type_accuracy": 1.0,
+      "m4_5_hallucination_rate": 0.0,
+      "m4_2_accumulator_contract_rate": 1.0,
+      "m4_12_numerical_match_rate": 0.8,
+      "m4_13_python_jaccard": 0.3752,
+      "m4_14_container_yml_jaccard": 1.0,
+      "runs": [
+        {
+          "run": 1,
+          "package_name": "pkg_3_eval",
+          "python_filename": "pkg_3_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run1.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run1.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "counts": {
+                "category": 2,
+                "C": 14,
+                "B": 25,
+                "D": 29,
+                "E": 19,
+                "A": 13
+              },
+              "rates": {
+                "category": 0.0196078431372549,
+                "C": 0.13725490196078433,
+                "B": 0.24509803921568626,
+                "D": 0.28431372549019607,
+                "E": 0.18627450980392157,
+                "A": 0.12745098039215685
+              },
+              "total": 102
+            },
+            "numerical_match_reason": "counts: key mismatch: {'E', 'category', 'B', 'D', 'C', 'A'} vs {'E', 'B', 'D', 'C', 'A'}",
+            "root_cause_category": "genuine_llm_bug",
+            "root_cause_explanation": "compute_local uses csv.reader() with positional indexing (row[0]) instead of csv.DictReader(). csv.reader does not auto-skip the header row, so the literal string \"category\" (the CSV header) gets counted as a data value, producing a spurious extra key."
+          }
+        },
+        {
+          "run": 2,
+          "package_name": "pkg_3_eval",
+          "python_filename": "pkg_3_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run2.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run2.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "counts": {
+                "C": 14,
+                "B": 25,
+                "D": 29,
+                "E": 19,
+                "A": 13
+              },
+              "rates": {
+                "C": 0.14,
+                "B": 0.25,
+                "D": 0.29,
+                "E": 0.19,
+                "A": 0.13
+              },
+              "total": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 3,
+          "package_name": "pkg_3_eval",
+          "python_filename": "pkg_3_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run3.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run3.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "counts": {
+                "A": 13,
+                "B": 25,
+                "C": 14,
+                "D": 29,
+                "E": 19
+              },
+              "rates": {
+                "A": 0.13,
+                "B": 0.25,
+                "C": 0.14,
+                "D": 0.29,
+                "E": 0.19
+              },
+              "total": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 4,
+          "package_name": "pkg_3_eval",
+          "python_filename": "pkg_3_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run4.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run4.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "counts": {
+                "C": 14,
+                "B": 25,
+                "D": 29,
+                "E": 19,
+                "A": 13
+              },
+              "rates": {
+                "C": 0.14,
+                "B": 0.25,
+                "D": 0.29,
+                "E": 0.19,
+                "A": 0.13
+              },
+              "total": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 5,
+          "package_name": "pkg_3_eval",
+          "python_filename": "pkg_3_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run5.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_3_run5.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "counts": {
+                "C": 14,
+                "B": 25,
+                "D": 29,
+                "E": 19,
+                "A": 13
+              },
+              "rates": {
+                "C": 0.14,
+                "B": 0.25,
+                "D": 0.29,
+                "E": 0.19,
+                "A": 0.13
+              },
+              "total": 100
+            },
+            "numerical_match_reason": null
+          }
+        }
+      ],
+      "m4_4_build": {
+        "built": true,
+        "pushed": true,
+        "image_name": "pkg_3_eval."
+      }
+    },
+    "pkg_4": {
+      "brane_name": "fed_variance",
+      "n_runs": 5,
+      "n_generation_failures": 0,
+      "m4_6_schema_valid_rate": 1.0,
+      "m4_5_avg_type_accuracy": 1.0,
+      "m4_5_hallucination_rate": 0.0,
+      "m4_2_accumulator_contract_rate": 1.0,
+      "m4_12_numerical_match_rate": 0.8,
+      "m4_13_python_jaccard": 0.5386,
+      "m4_14_container_yml_jaccard": 1.0,
+      "runs": [
+        {
+          "run": 1,
+          "package_name": "pkg_4_eval",
+          "python_filename": "pkg_4_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run1.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run1.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "variance": 103.60594467116404,
+              "mean": 47.635694,
+              "count": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 2,
+          "package_name": "pkg_4_eval",
+          "python_filename": "pkg_4_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run2.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run2.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "variance": 103.60594467116404,
+              "mean": 47.635694,
+              "count": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 3,
+          "package_name": "pkg_4_eval",
+          "python_filename": "pkg_4_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run3.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run3.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "variance": 103.60594467116404,
+              "mean": 47.635694,
+              "count": 100
+            },
+            "numerical_match_reason": null
+          }
+        },
+        {
+          "run": 4,
+          "package_name": "pkg_4_eval",
+          "python_filename": "pkg_4_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run4.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run4.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "variance": 104.65246936481215,
+              "mean": 47.635694,
+              "count": 100
+            },
+            "numerical_match_reason": "variance: diff=1.046524364812143",
+            "root_cause_category": "spec_deviation",
+            "root_cause_explanation": "finalize computes variance = M2/(count-1) (Bessel's correction / sample variance) instead of M2/count (population variance) as explicitly instructed in the description (\"the finalize function divides M2 by count\"). A defensible statistical convention on its own, but deviates from the literal instruction given -- same directive-vs-description tension as CG1."
+          }
+        },
+        {
+          "run": 5,
+          "package_name": "pkg_4_eval",
+          "python_filename": "pkg_4_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run5.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_4_run5.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 7,
+            "total_reference_triples": 7,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": true,
+            "accumulator_contract_ok": true,
+            "final_result": {
+              "variance": 103.60594467116404,
+              "mean": 47.635694,
+              "count": 100
+            },
+            "numerical_match_reason": null
+          }
+        }
+      ],
+      "m4_4_build": {
+        "built": true,
+        "pushed": true,
+        "image_name": "pkg_4_eval."
+      }
+    },
+    "pkg_5": {
+      "brane_name": "fed_single",
+      "n_runs": 5,
+      "n_generation_failures": 0,
+      "m4_6_schema_valid_rate": 1.0,
+      "m4_5_avg_type_accuracy": 1.0,
+      "m4_5_hallucination_rate": 0.8,
+      "m4_2_accumulator_contract_rate": null,
+      "m4_12_numerical_match_rate": 0.0,
+      "m4_13_python_jaccard": 0.447,
+      "m4_14_container_yml_jaccard": 0.6071,
+      "runs": [
+        {
+          "run": 1,
+          "package_name": "pkg_5_eval",
+          "python_filename": "pkg_5_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run1.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run1.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 2,
+            "total_reference_triples": 2,
+            "missing_actions": [],
+            "hallucinated_actions": [
+              "combine_results",
+              "finalize"
+            ],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": null,
+            "final_result": {
+              "sum": 5029.0165,
+              "count": 50,
+              "mean": 100.5803
+            },
+            "numerical_match_note": "pkg_5 is intentionally single-participant; baseline is pooled -- mismatch is expected, same as M4.1/e2e_results.json"
+          }
+        },
+        {
+          "run": 2,
+          "package_name": "pkg_5_eval",
+          "python_filename": "pkg_5_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run2.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run2.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 2,
+            "total_reference_triples": 2,
+            "missing_actions": [],
+            "hallucinated_actions": [
+              "combine_results",
+              "finalize"
+            ],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": null,
+            "final_result": {
+              "sum": 5029.0165,
+              "count": 50,
+              "mean": 100.5803
+            },
+            "numerical_match_note": "pkg_5 is intentionally single-participant; baseline is pooled -- mismatch is expected, same as M4.1/e2e_results.json"
+          }
+        },
+        {
+          "run": 3,
+          "package_name": "pkg_5_eval",
+          "python_filename": "pkg_5_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run3.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run3.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 2,
+            "total_reference_triples": 2,
+            "missing_actions": [],
+            "hallucinated_actions": [],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": null,
+            "final_result": {
+              "sum": 5029.0165,
+              "count": 50,
+              "mean": 100.5803
+            },
+            "numerical_match_note": "pkg_5 is intentionally single-participant; baseline is pooled -- mismatch is expected, same as M4.1/e2e_results.json"
+          }
+        },
+        {
+          "run": 4,
+          "package_name": "pkg_5_eval",
+          "python_filename": "pkg_5_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run4.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run4.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 2,
+            "total_reference_triples": 2,
+            "missing_actions": [],
+            "hallucinated_actions": [
+              "combine_results",
+              "finalize"
+            ],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": null,
+            "final_result": {
+              "sum": 5029.0165,
+              "count": 50,
+              "mean": 100.5803
+            },
+            "numerical_match_note": "pkg_5 is intentionally single-participant; baseline is pooled -- mismatch is expected, same as M4.1/e2e_results.json"
+          }
+        },
+        {
+          "run": 5,
+          "package_name": "pkg_5_eval",
+          "python_filename": "pkg_5_eval.py",
+          "python_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run5.py",
+          "container_yml_path": "/home/aditya/thesis/integrator/brane-integrator/evaluation/results/generated_packages/pkg_5_run5.yml",
+          "m4_6_schema_valid": true,
+          "m4_6_schema_reason": null,
+          "m4_5_type_report": {
+            "accuracy": 1.0,
+            "matched_count": 2,
+            "total_reference_triples": 2,
+            "missing_actions": [],
+            "hallucinated_actions": [
+              "combine_results",
+              "finalize"
+            ],
+            "wrong_type": [],
+            "wrong_param": []
+          },
+          "m4_12_numerical": {
+            "error": null,
+            "numerical_match": false,
+            "accumulator_contract_ok": null,
+            "final_result": {
+              "sum": 5029.0165,
+              "count": 50,
+              "mean": 100.5803
+            },
+            "numerical_match_note": "pkg_5 is intentionally single-participant; baseline is pooled -- mismatch is expected, same as M4.1/e2e_results.json"
+          }
+        }
+      ],
+      "m4_4_build": {
+        "built": true,
+        "pushed": true,
+        "image_name": "pkg_5_eval."
+      }
+    }
+  }
+}
