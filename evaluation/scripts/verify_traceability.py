@@ -5,22 +5,90 @@ import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 os.environ.setdefault("BRANE_INTEGRATOR_API_KEY", "eval")
 
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "../results")
 
+# Technical identifiers only — not governance obligations, excluded from the expected-field set.
+PROJECT_ID_FIELDS = {"project_id"}
+PARTICIPANT_ID_FIELDS = {"user_id", "extracted_claims"}
+# study_objective is descriptive metadata (what the computation does), not a governance/privacy
+# obligation, so it is excluded from the expected set for the same reason as project_id — it
+# already carries no construct/flag in generate_traceability_report (see WF_SKIP_FIELDS).
+PROJECT_NON_GOVERNANCE_FIELDS = {"study_objective"}
 
-def compute_metrics(mappings):
+
+def expected_field_keys(config) -> set:
+    """Every non-empty in-scope governance source field on the config, independent of
+    whatever generate_traceability_report() actually produced. This is the denominator
+    M1.1 must be measured against — it must never be derived from the generated mappings."""
+    keys = set()
+
+    project_data = config.project.model_dump()
+    for field, value in project_data.items():
+        if field in PROJECT_ID_FIELDS or field in PROJECT_NON_GOVERNANCE_FIELDS or not value:
+            continue
+        keys.add(f"project:{field}")
+
+    for participant in config.participants:
+        pdata = participant.model_dump()
+        for field, value in pdata.items():
+            if field in PARTICIPANT_ID_FIELDS or not value:
+                continue
+            keys.add(f"participant:{participant.user_id}:{field}")
+
+    return keys
+
+
+def covered_field_keys(mappings, config) -> set:
+    """Which expected field keys are actually accounted for in the generated mappings —
+    as a construct, a flag, or (for free-text fields) a recorded 'processed' entry.
+    Jurisdictions are list-valued and aggregated/deduplicated at workflow level by design
+    (see policy_interpreter.py), so a participant's jurisdictions entry is covered if every
+    value in their list appears in some jurisdiction mapping, not by participant_user_id
+    linkage — the aggregated mappings do not carry participant identity, by design."""
+    covered = set()
+
+    project_fields_seen = {
+        m["policy_field"] for m in mappings if m["participant_user_id"] is None and m["policy_field"] != "jurisdictions"
+    }
+    for field in project_fields_seen:
+        covered.add(f"project:{field}")
+
+    jurisdiction_values_seen = {
+        m["policy_value"] for m in mappings if m["policy_field"] == "jurisdictions"
+    }
+    for participant in config.participants:
+        juris = participant.jurisdictions or []
+        if juris and all(j in jurisdiction_values_seen for j in juris):
+            covered.add(f"participant:{participant.user_id}:jurisdictions")
+
+    for m in mappings:
+        uid = m["participant_user_id"]
+        field = m["policy_field"]
+        if uid is None or field == "jurisdictions":
+            continue
+        covered.add(f"participant:{uid}:{field}")
+
+    return covered
+
+
+def compute_metrics(mappings, config):
     total = len(mappings)
-    if total == 0:
-        return {"total_mappings": 0, "construct_generating": 0, "flagged": 0,
-                "with_line_numbers": 0, "coverage_rate": 0.0,
-                "construct_to_flag_ratio": 0.0, "line_verifiability_rate": 0.0}
 
     construct_generating = [m for m in mappings if not m.get("flagged") and m.get("generated_construct")]
     flagged = [m for m in mappings if m.get("flagged")]
     with_lines = [m for m in construct_generating if m.get("line") is not None]
 
-    # M1.1: every field (flagged or not) appears in the report → coverage is always total/total
-    coverage_rate = 1.0
+    expected = expected_field_keys(config)
+    covered = covered_field_keys(mappings, config)
+    missing = sorted(expected - covered)
+
+    # M1.1: fraction of independently-enumerated source fields that are actually
+    # accounted for in the report (construct, flag, or recorded free-text processing) —
+    # NOT total/total against the report's own mapping count.
+    coverage_rate = round(len(covered & expected) / len(expected), 4) if expected else 1.0
 
     # M1.2: construct-generating entries / flagged entries
     construct_to_flag = (
@@ -37,6 +105,9 @@ def compute_metrics(mappings):
         "construct_generating": len(construct_generating),
         "flagged": len(flagged),
         "with_line_numbers": len(with_lines),
+        "expected_field_count": len(expected),
+        "covered_field_count": len(covered & expected),
+        "missing_field_keys": missing,
         "coverage_rate": coverage_rate,
         "construct_to_flag_ratio": construct_to_flag,
         "line_verifiability_rate": line_verifiability,
@@ -46,8 +117,10 @@ def compute_metrics(mappings):
 def analyse_scenarios():
     from app.domain.config import IntegratorConfig, ProjectBlock, WorkflowSpec, ParticipantPolicy
     from app.application.workflow_generation.policy_interpreter import PolicyInterpreter
+    from app.application.workflow_generation.free_text_extractor import FreeTextExtractor
     from app.application.workflow_generation.strategy.template_generator import TemplateGenerator
     from app.application.workflow_generation.validator import Validator
+    from app.infrastructure.llm_service import OpenAILlmService
     from app.infrastructure.branehub_schema import (
         FDP_DATA_SENSITIVITY, FDP_LEGAL_BASIS, FDP_STUDY_OBJECTIVE,
         FDP_THIRD_PARTY_COLLABORATION, FDP_SECURITY_MEASURES,
@@ -66,6 +139,8 @@ def analyse_scenarios():
 
     per_scenario = {}
     interpreter = PolicyInterpreter()
+    extractor = FreeTextExtractor()
+    llm_service = OpenAILlmService()
     generator = TemplateGenerator()
     validator = Validator()
 
@@ -128,10 +203,14 @@ def analyse_scenarios():
             ))
 
         config = IntegratorConfig(project=project, workflow=workflow, participants=participants)
+        # Run the real free-text extraction pipeline (RQ3) — previously skipped entirely,
+        # which meant privacy_legal_notes/data_provenance/source_of_truth were always
+        # invisible to this evaluation regardless of content (see scenarios 6-8).
+        config = extractor.extract(config, llm_service)
         interpreted = interpreter.interpret(config)
         branescript = generator.generate(config, interpreted)
         mappings = validator.generate_traceability_report(branescript, config, interpreted)["mappings"]
-        per_scenario[str(scenario_id)] = compute_metrics(mappings)
+        per_scenario[str(scenario_id)] = compute_metrics(mappings, config)
         print(f"  S{scenario_id}: {per_scenario[str(scenario_id)]}")
 
     return per_scenario
@@ -147,6 +226,9 @@ def main():
     all_coverage = [v["coverage_rate"] for v in per_scenario.values()]
     all_cf_ratio = [v["construct_to_flag_ratio"] for v in per_scenario.values() if v["construct_to_flag_ratio"] is not None]
     all_lv = [v["line_verifiability_rate"] for v in per_scenario.values()]
+    total_expected = sum(v["expected_field_count"] for v in per_scenario.values())
+    total_covered = sum(v["covered_field_count"] for v in per_scenario.values())
+    all_missing = {k: v["missing_field_keys"] for k, v in per_scenario.items() if v["missing_field_keys"]}
 
     output = {
         "per_scenario": per_scenario,
@@ -154,6 +236,10 @@ def main():
             "avg_coverage_rate": round(sum(all_coverage) / len(all_coverage), 4),
             "avg_construct_to_flag_ratio": round(sum(all_cf_ratio) / len(all_cf_ratio), 4) if all_cf_ratio else None,
             "avg_line_verifiability_rate": round(sum(all_lv) / len(all_lv), 4),
+            "total_expected_field_count": total_expected,
+            "total_covered_field_count": total_covered,
+            "overall_coverage_rate": round(total_covered / total_expected, 4) if total_expected else 1.0,
+            "scenarios_with_missing_fields": all_missing,
         },
     }
 
@@ -162,9 +248,11 @@ def main():
         json.dump(output, f, indent=2)
 
     agg = output["aggregate"]
-    print(f"\nM1.1 avg coverage_rate:          {agg['avg_coverage_rate']}")
+    print(f"\nM1.1 avg coverage_rate:          {agg['avg_coverage_rate']} ({agg['total_covered_field_count']}/{agg['total_expected_field_count']} expected fields)")
     print(f"M1.2 avg construct_to_flag_ratio: {agg['avg_construct_to_flag_ratio']}")
     print(f"M1.4 avg line_verifiability_rate: {agg['avg_line_verifiability_rate']}")
+    if agg["scenarios_with_missing_fields"]:
+        print(f"Missing fields by scenario: {agg['scenarios_with_missing_fields']}")
     print(f"Written: {out_path}")
 
 

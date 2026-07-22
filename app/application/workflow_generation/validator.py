@@ -18,6 +18,7 @@ from app.application.workflow_generation.policy_interpreter import (
     WORKFLOW_REGISTRY,
     WF_SKIP_FIELDS,
 )
+from app.application.workflow_generation.free_text_extractor import FREE_TEXT_FIELDS
 
 
 class RuleResult(BaseModel):
@@ -325,8 +326,40 @@ class Validator:
                         "note": None,
                     })
 
-        # extracted claims from free-text (RQ3)
+        # free-text source fields (RQ3) — every non-empty free-text field gets its own
+        # mapping entry unconditionally, even if FreeTextExtractor found zero claims in it.
+        # Without this, a field that produces no claims simply never appears anywhere in
+        # the report — silently indistinguishable from a field that was never collected.
         for participant in config.participants:
+            claims_by_source: dict[str, list] = {}
+            for claim in participant.extracted_claims:
+                claims_by_source.setdefault(claim.source_field, []).append(claim)
+
+            for source_field in FREE_TEXT_FIELDS:
+                value = getattr(participant, source_field, None)
+                if not value:
+                    continue
+                field_claims = claims_by_source.get(source_field, [])
+                mappings.append({
+                    "participant_node": participant.brane_node,
+                    "participant_user_id": participant.user_id,
+                    "policy_field": source_field,
+                    "policy_value": value,
+                    "generated_construct": None,
+                    "line": None,
+                    "flagged": True,
+                    "reason": (
+                        f"Free-text field processed by FreeTextExtractor — {len(field_claims)} "
+                        f"claim(s) extracted (see child mappings below)."
+                        if field_claims else
+                        "Free-text field processed by FreeTextExtractor — no claims extracted; "
+                        "flagged for human review of the source text."
+                    ),
+                    "note": None,
+                })
+
+            # extracted claims from free-text (RQ3) — child mappings, each still tagged
+            # with the source_field it came from so the chain stays auditable
             for claim in participant.extracted_claims:
                 if claim.policy_field in PARTICIPANT_REGISTRY:
                     construct = PARTICIPANT_REGISTRY[claim.policy_field](claim.policy_value)
