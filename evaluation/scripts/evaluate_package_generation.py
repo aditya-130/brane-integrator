@@ -516,6 +516,9 @@ def main():
         print(f"  {k}: {v}")
     print(f"\nWritten: {out_path}")
 
+    from cost_utils import print_usage_summary
+    print_usage_summary(llm_service.usage_log, label="Package generation LLM usage")
+
 
 if __name__ == "__main__":
     main()

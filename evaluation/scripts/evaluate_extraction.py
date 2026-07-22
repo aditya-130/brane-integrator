@@ -196,6 +196,9 @@ def main():
     print(f"M4.11 Low-filtered rate: {low_filtered_rate:.1%}")
     print(f"Written: {out_path}")
 
+    from cost_utils import print_usage_summary
+    print_usage_summary(llm_service.usage_log, label="Extraction LLM usage")
+
 
 if __name__ == "__main__":
     main()

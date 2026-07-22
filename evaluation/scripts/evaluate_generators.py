@@ -232,6 +232,10 @@ def main():
         print(f"M3.3 Rule failure distribution:    {rule_failure_dist}")
     print(f"Written: {out_path}")
 
+    if llm_service is not None:
+        from cost_utils import print_usage_summary
+        print_usage_summary(llm_service.usage_log, label="BraneScript generation LLM usage")
+
 
 if __name__ == "__main__":
     main()
