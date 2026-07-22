@@ -1,0 +1,27 @@
+{
+  "pkg_1": {
+    "brane_name": "fed_mean",
+    "study_objective": "Compute the average age of patients per cancer type across multiple hospital sites.",
+    "computation_description": "Each hospital's CSV has columns: cancer_type, age. The local function should return a dict keyed by cancer_type, each value {\"count\": N, \"age_sum\": S} - e.g. {\"Lung\": {\"count\": 12, \"age_sum\": 720.5}}. The combine function must NOT compute a mean. It is a pure accumulator: for each cancer_type present in either input, sum the counts and sum the age_sums, returning the same {cancer_type: {count, age_sum}} structure. The finalize function divides age_sum by count per cancer_type to produce the final mean age."
+  },
+  "pkg_2": {
+    "brane_name": "fed_logreg",
+    "study_objective": "Train a single-step federated logistic regression model predicting a binary label from a numeric feature, across multiple hospital sites, without sharing patient-level data.",
+    "computation_description": "Each hospital's CSV has columns: feature (numeric), label (0 or 1). The local function should return {\"gradients\": [g], \"n_samples\": N}, where g is the sum over local rows of (sigmoid(feature) - label) * feature, and n_samples is the local row count. The combine function must NOT apply a gradient step or produce weights. It is a pure accumulator: sum the gradients element-wise and sum n_samples, returning the same {\"gradients\": [...], \"n_samples\": N} structure. The finalize function divides the accumulated gradient by total n_samples, applies one gradient-descent step with learning rate 0.01, and returns {\"weights\": [...], \"n_samples\": N}."
+  },
+  "pkg_3": {
+    "brane_name": "fed_histogram",
+    "study_objective": "Compute a frequency histogram of a categorical clinical variable across multiple hospital sites.",
+    "computation_description": "Each hospital's CSV has one column: category. The local function should return a dict mapping each category value to its local count, e.g. {\"A\": 12, \"B\": 8}. The combine function must NOT compute totals or rates. It is a pure accumulator: for every category present in either input, sum the counts, returning the same {category: count} structure. The finalize function computes the total count across categories and, for each category, its rate (count / total), returning {\"counts\": {...}, \"rates\": {...}, \"total\": T}."
+  },
+  "pkg_4": {
+    "brane_name": "fed_variance",
+    "study_objective": "Compute the variance of a continuous clinical measurement across multiple hospital sites using a numerically stable federated algorithm.",
+    "computation_description": "Each hospital's CSV has one column: value (numeric). The local function should compute count, mean, and M2 (sum of squared differences from the mean) via Welford's online algorithm over its local rows, returning {\"count\": N, \"mean\": M, \"M2\": S}. The combine function must NOT divide M2 by count or produce a variance. It is a pure accumulator using the parallel-variance merge formula: given (n1, mean1, M2_1) and (n2, mean2, M2_2), compute n = n1+n2, delta = mean2-mean1, mean = (n1*mean1 + n2*mean2)/n, M2 = M2_1 + M2_2 + delta^2 * n1 * n2 / n, returning {\"count\": n, \"mean\": mean, \"M2\": M2} - the same structure as the local function's output. The finalize function divides M2 by count to produce the variance, returning {\"variance\": ..., \"mean\": ..., \"count\": ...}."
+  },
+  "pkg_5": {
+    "brane_name": "fed_single",
+    "study_objective": "Analyse local patient statistics (sum, count, mean) at a single research site - no data is combined across sites.",
+    "computation_description": "The CSV has one column: value (numeric). The local function should compute the sum, count, and mean directly over local rows, returning {\"sum\": S, \"count\": N, \"mean\": round(S/N, 4)}. This is a single-site computation only - do NOT generate a combine function or a finalize function that merges results across participants. The local function's output is the final result."
+  }
+}

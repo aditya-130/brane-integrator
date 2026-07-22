@@ -1,0 +1,25 @@
+import fed_logreg;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.consent")]
+#![wf_tag("jurisdiction.EU")]
+
+let data_1 := new Data { name := "eval_logreg_p1" };
+let data_2 := new Data { name := "eval_logreg_p3" };
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := compute_local(data_1);
+
+#[on("participant-3")]
+#[tag("identifiability.Anonymized")]
+let stats_2 := compute_local(data_2);
+
+#[on("coordinator-1")]
+let acc_0 := combine_results(stats_1, stats_2);
+let result := acc_0;
+
+#[on("coordinator-1")]
+let final_result := finalize(result);
+
+return final_result;

@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "project_id": 7,
+  "project": {
+    "title": "FedCancer S7: Sparse Structured + Rich Free-Text",
+    "type": "FDP",
+    "status": "open",
+    "fdp_config": {
+      "study_objective": "Compute federated mean age by cancer type — minimal structured fields, rich free-text only",
+      "data_sensitivity_level": null,
+      "legal_basis_for_processing": null,
+      "security_measures_planned": null,
+      "result_sharing_policy": null,
+      "participant_responsibilities": null,
+      "third_party_collaboration": null
+    }
+  },
+  "accepted_participants": [
+    {
+      "user_id": 1,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s7_p1" },
+      "onboarding_answers": {
+        "organization.jurisdictions": null,
+        "identifiability.processingLevel": null,
+        "dataNature.involvesHumanResearch": null,
+        "dataNature.retrospectiveConsent": null,
+        "ethicalLegal.irbApproval": null,
+        "identifiability.directIdentifiers": null,
+        "identifiability.quasiIdentifiers": null,
+        "securityInfrastructure.auditLoggingRequired": null,
+        "securityInfrastructure.networkConnectionPolicy": null,
+        "securityInfrastructure.securityCertifications": null,
+        "dataGovernance.agreementsExist": null,
+        "dataGovernance.modelUpdatesAllowed": null,
+        "dataGovernance.requiresPerRoundApproval": null,
+        "retentionRevocation.requiresUnlearning": null
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "Patient identifiers have been replaced with pseudonyms using AES-256 encryption. The original identifiers are not stored within this project environment. All participants gave explicit written consent for use of their de-identified records in federated research.",
+        "meta.provenance": "This dataset is derived from our hospital's oncology registry. It contains highly sensitive clinical data including diagnosis codes, treatment histories, and survival outcomes. The data has been pseudonymized but retains sufficient clinical detail for meaningful analysis.",
+        "storage.source_of_truth": "Our institution processes this data under legitimate interest as part of our quality improvement mandate. Records are held in our secure research data warehouse with role-based access controls."
+      }
+    },
+    {
+      "user_id": 3,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s7_p3" },
+      "onboarding_answers": {
+        "organization.jurisdictions": null,
+        "identifiability.processingLevel": null,
+        "dataNature.involvesHumanResearch": null,
+        "dataNature.retrospectiveConsent": null,
+        "ethicalLegal.irbApproval": null,
+        "identifiability.directIdentifiers": null,
+        "identifiability.quasiIdentifiers": null,
+        "securityInfrastructure.auditLoggingRequired": null,
+        "securityInfrastructure.networkConnectionPolicy": null,
+        "securityInfrastructure.securityCertifications": null,
+        "dataGovernance.agreementsExist": null,
+        "dataGovernance.modelUpdatesAllowed": null,
+        "dataGovernance.requiresPerRoundApproval": null,
+        "retentionRevocation.requiresUnlearning": null
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "This data has been fully anonymized according to ISO 29101 guidelines. All direct and quasi-identifiers have been removed. Re-identification risk has been assessed and confirmed negligible by our data protection officer.",
+        "meta.provenance": "Aggregated clinical records from our regional cancer network covering 2020-2024. Data sensitivity is low as no individual-level identifiers remain after anonymization.",
+        "storage.source_of_truth": "Stored in our institution's federated research platform. Access is governed by a data sharing agreement signed by all consortium members."
+      }
+    }
+  ]
+}

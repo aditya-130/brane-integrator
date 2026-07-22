@@ -1,0 +1,81 @@
+{
+  "per_scenario": {
+    "1": {
+      "total_mappings": 36,
+      "construct_generating": 9,
+      "flagged": 27,
+      "with_line_numbers": 9,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.3333,
+      "line_verifiability_rate": 1.0
+    },
+    "2": {
+      "total_mappings": 36,
+      "construct_generating": 9,
+      "flagged": 27,
+      "with_line_numbers": 9,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.3333,
+      "line_verifiability_rate": 1.0
+    },
+    "3": {
+      "total_mappings": 53,
+      "construct_generating": 14,
+      "flagged": 39,
+      "with_line_numbers": 14,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.359,
+      "line_verifiability_rate": 1.0
+    },
+    "4": {
+      "total_mappings": 66,
+      "construct_generating": 15,
+      "flagged": 51,
+      "with_line_numbers": 15,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.2941,
+      "line_verifiability_rate": 1.0
+    },
+    "5": {
+      "total_mappings": 36,
+      "construct_generating": 9,
+      "flagged": 27,
+      "with_line_numbers": 9,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.3333,
+      "line_verifiability_rate": 1.0
+    },
+    "6": {
+      "total_mappings": 36,
+      "construct_generating": 9,
+      "flagged": 27,
+      "with_line_numbers": 9,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.3333,
+      "line_verifiability_rate": 1.0
+    },
+    "7": {
+      "total_mappings": 4,
+      "construct_generating": 4,
+      "flagged": 0,
+      "with_line_numbers": 4,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": null,
+      "line_verifiability_rate": 1.0
+    },
+    "8": {
+      "total_mappings": 37,
+      "construct_generating": 10,
+      "flagged": 27,
+      "with_line_numbers": 10,
+      "coverage_rate": 1.0,
+      "construct_to_flag_ratio": 0.3704,
+      "line_verifiability_rate": 1.0
+    }
+  },
+  "aggregate": {
+    "avg_coverage_rate": 1.0,
+    "avg_construct_to_flag_ratio": 0.3367,
+    "avg_line_verifiability_rate": 1.0
+  }
+}

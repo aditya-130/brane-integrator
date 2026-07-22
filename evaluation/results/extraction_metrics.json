@@ -1,0 +1,849 @@
+{
+  "precision": 0.8222,
+  "recall": 0.9333,
+  "f1": 0.8407,
+  "jaccard_consistency": 0.9444,
+  "confidence_distribution": {
+    "high": 92,
+    "medium": 3,
+    "low": 0,
+    "total": 95
+  },
+  "low_filtered_rate": 0.0,
+  "n_runs": 5,
+  "n_entries": 18,
+  "per_entry": [
+    {
+      "id": "gs_001",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "identifiability",
+          "policy_value": "Pseudonymized"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_002",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "identifiability",
+          "policy_value": "Anonymized"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_003",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "identifiability",
+          "policy_value": "Identified"
+        }
+      ],
+      "avg_precision": 0.6,
+      "avg_recall": 1.0,
+      "avg_f1": 0.7334,
+      "avg_jaccard": 0.8,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Identified"
+          ],
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Identified"
+          ],
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Identified"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Identified"
+          ],
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Identified"
+          ],
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_005",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "legal_basis",
+          "policy_value": "consent"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "legal_basis",
+            "consent"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "consent"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "consent"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "consent"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "consent"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_006",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "high"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_007",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "low"
+        }
+      ],
+      "avg_precision": 0.9,
+      "avg_recall": 1.0,
+      "avg_f1": 0.9333,
+      "avg_jaccard": 0.8,
+      "runs": [
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ],
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_008",
+      "source_field": "data_provenance",
+      "expected_claims": [],
+      "avg_precision": 0.0,
+      "avg_recall": 1.0,
+      "avg_f1": 0.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_009",
+      "source_field": "source_of_truth",
+      "expected_claims": [
+        {
+          "policy_field": "legal_basis",
+          "policy_value": "legal_obligation"
+        }
+      ],
+      "avg_precision": 0.5,
+      "avg_recall": 1.0,
+      "avg_f1": 0.6667,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "legal_basis",
+            "legal_obligation"
+          ],
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legal_obligation"
+          ],
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legal_obligation"
+          ],
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legal_obligation"
+          ],
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legal_obligation"
+          ],
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_010",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "identifiability",
+          "policy_value": "Pseudonymized"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Pseudonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_011",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "medium"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_012",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "legal_basis",
+          "policy_value": "legitimate_interest"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "legal_basis",
+            "legitimate_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legitimate_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legitimate_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legitimate_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "legitimate_interest"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_014",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "low"
+        }
+      ],
+      "avg_precision": 0.0,
+      "avg_recall": 0.0,
+      "avg_f1": 0.0,
+      "avg_jaccard": 0.8,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ],
+          [
+            "data_sensitivity",
+            "medium"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_015",
+      "source_field": "source_of_truth",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "high"
+        }
+      ],
+      "avg_precision": 0.8,
+      "avg_recall": 0.8,
+      "avg_f1": 0.8,
+      "avg_jaccard": 0.6,
+      "runs": [
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "high"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_016",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "legal_basis",
+          "policy_value": "vital_interest"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "legal_basis",
+            "vital_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "vital_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "vital_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "vital_interest"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "vital_interest"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_017",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "identifiability",
+          "policy_value": "Anonymized"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ],
+        [
+          [
+            "identifiability",
+            "Anonymized"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_018",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [
+        {
+          "policy_field": "legal_basis",
+          "policy_value": "public_task"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "legal_basis",
+            "public_task"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "public_task"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "public_task"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "public_task"
+          ]
+        ],
+        [
+          [
+            "legal_basis",
+            "public_task"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_019",
+      "source_field": "data_provenance",
+      "expected_claims": [
+        {
+          "policy_field": "data_sensitivity",
+          "policy_value": "low"
+        }
+      ],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ],
+        [
+          [
+            "data_sensitivity",
+            "low"
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "gs_020",
+      "source_field": "privacy_legal_notes",
+      "expected_claims": [],
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0,
+      "avg_jaccard": 1.0,
+      "runs": [
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    }
+  ]
+}

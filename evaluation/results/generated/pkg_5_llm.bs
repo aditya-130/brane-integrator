@@ -1,0 +1,16 @@
+import fed_single;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.consent")]
+#![wf_tag("jurisdiction.EU")]
+
+let data_1 := new Data { name := "eval_single_p1" };
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := compute_local(data_1);
+
+#[on("coordinator-1")]
+let result := combine_results(stats_1, stats_1);
+
+return result;

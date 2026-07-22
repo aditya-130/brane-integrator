@@ -1,0 +1,93 @@
+{
+  "1": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-1",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  },
+  "2": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-2",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  },
+  "3": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-3",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"},
+      {"user_id": 5, "brane_node": "participant-5"}
+    ]
+  },
+  "4": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-4",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"},
+      {"user_id": 5, "brane_node": "participant-5"},
+      {"user_id": 7, "brane_node": "participant-7"}
+    ]
+  },
+  "5": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-5",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  },
+  "6": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-6",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  },
+  "7": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-7",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  },
+  "8": {
+    "package": "fed_mean",
+    "local_function": "compute_local",
+    "combine_function": "combine_results",
+    "coordinator_node": "coordinator-8",
+    "finalize_function": "finalize",
+    "participants": [
+      {"user_id": 1, "brane_node": "participant-1"},
+      {"user_id": 3, "brane_node": "participant-3"}
+    ]
+  }
+}

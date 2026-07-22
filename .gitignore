@@ -1,3 +1,6 @@
+# Brane build artifacts
+evaluation/packages/*/branelet
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

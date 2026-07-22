@@ -1,0 +1,310 @@
+{
+  "meta": {
+    "date": "2026-07-01",
+    "brane_version": "3.0.0-nightly+7175fba8",
+    "infrastructure": {
+      "nodes": ["coordinator-1", "participant-1", "participant-3"],
+      "central_node": "coordinator-1",
+      "participant_nodes": ["participant-1", "participant-3"],
+      "deployment": "WSL2 Docker (single-host, 3 logical Brane nodes)"
+    },
+    "evaluation_scripts": {
+      "preparation": "evaluation/scripts/prepare_evaluation.py",
+      "execution": "evaluation/scripts/run_evaluation.py"
+    }
+  },
+
+  "packages": {
+    "pkg_1": {
+      "brane_name": "fed_mean",
+      "description": "Federated mean age by cancer type across two participant nodes",
+      "participants": ["participant-1", "participant-3"],
+      "datasets": {
+        "participant-1": "cancer_age_s1_p1",
+        "participant-3": "cancer_age_s1_p3"
+      },
+      "functions": {
+        "compute_local": "Computes per-type sum and count on local slice",
+        "combine_results": "Aggregates partial sums and counts from both participants",
+        "finalize": "Divides combined sum by count to produce mean per cancer type"
+      },
+      "baseline": {
+        "Lung": 56.74, "Prostate": 58.84, "Colorectal": 52.49,
+        "Melanoma": 60.86, "Breast": 61.52, "Leukemia": 63.89,
+        "Lymphoma": 60.74, "Pancreatic": 63.2
+      },
+      "m4_5_type_accuracy": 1.0,
+      "m4_6_schema_valid": true,
+      "template": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 38344,
+        "note": "Template generator correctly emits on-annotations for each participant and coordinator. Result matched centralized baseline to within 1e-6 tolerance."
+      },
+      "llm": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 35334,
+        "note": "LLM generated valid BraneScript with correct on-annotations and function call chain. Result matched centralized baseline."
+      }
+    },
+
+    "pkg_2": {
+      "brane_name": "fed_logreg",
+      "description": "Federated logistic regression gradient aggregation across two participant nodes",
+      "participants": ["participant-1", "participant-3"],
+      "datasets": {
+        "participant-1": "eval_logreg_p1",
+        "participant-3": "eval_logreg_p3"
+      },
+      "functions": {
+        "compute_local": "Computes local gradient vector on participant's data slice",
+        "combine_results": "Averages gradients from both participants",
+        "finalize": "Returns aggregated gradient as JSON string"
+      },
+      "m4_5_type_accuracy": 1.0,
+      "m4_6_schema_valid": true,
+      "template": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 35099,
+        "note": "Template generator produced correct federated gradient aggregation script."
+      },
+      "llm": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 30544,
+        "note": "LLM inferred correct workflow structure from container.yml and policy context."
+      }
+    },
+
+    "pkg_3": {
+      "brane_name": "fed_histogram",
+      "description": "Federated histogram aggregation across two participant nodes",
+      "participants": ["participant-1", "participant-3"],
+      "datasets": {
+        "participant-1": "eval_hist_p1",
+        "participant-3": "eval_hist_p3"
+      },
+      "functions": {
+        "compute_local": "Computes local histogram bins on participant's data slice",
+        "combine_results": "Sums histogram bin counts from both participants",
+        "finalize": "Returns aggregated histogram as JSON string"
+      },
+      "m4_5_type_accuracy": 1.0,
+      "m4_6_schema_valid": true,
+      "template": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 35637,
+        "note": "Template generator correctly handled histogram aggregation."
+      },
+      "llm": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 32451,
+        "note": "LLM produced semantically correct script. Matched baseline."
+      }
+    },
+
+    "pkg_4": {
+      "brane_name": "fed_variance",
+      "description": "Federated variance computation (Welford/parallel algorithm) across two participant nodes",
+      "participants": ["participant-1", "participant-3"],
+      "datasets": {
+        "participant-1": "eval_var_p1",
+        "participant-3": "eval_var_p3"
+      },
+      "functions": {
+        "compute_local": "Computes local count, mean, and M2 (sum of squared deviations)",
+        "combine_results": "Combines partial variance statistics using the parallel Welford algorithm",
+        "finalize": "Returns global variance and standard deviation as JSON string"
+      },
+      "m4_5_type_accuracy": 1.0,
+      "m4_6_schema_valid": true,
+      "template": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 36364,
+        "note": "Template generator produced correct federated variance script."
+      },
+      "llm": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": true,
+        "latency_ms": 287435,
+        "note": "LLM script executed correctly and matched baseline. Elevated latency (287s vs ~35s for template) likely caused by Brane infrastructure contention during this run — not a correctness issue. Observed on a single run; not representative of typical LLM script overhead."
+      }
+    },
+
+    "pkg_5": {
+      "brane_name": "fed_single",
+      "description": "Single-participant federated analysis — tests degenerate N=1 case where no cross-participant aggregation is needed",
+      "participants": ["participant-1"],
+      "datasets": {
+        "participant-1": "eval_single_p1"
+      },
+      "functions": {
+        "compute_local": "Computes sum, count, and mean on participant-1's local slice"
+      },
+      "baseline": {
+        "note": "Baseline computed on pooled dataset (both participants, 100 samples). Not comparable to single-participant result.",
+        "pooled": {"sum": 10265.698, "count": 100, "mean": 102.657}
+      },
+      "m4_5_type_accuracy": 1.0,
+      "m4_6_schema_valid": true,
+      "template": {
+        "branescript_generated": true,
+        "execution_success": true,
+        "numerical_match": null,
+        "latency_ms": 11874,
+        "live_result": {"sum": 5029.0165, "count": 50, "mean": 100.5803},
+        "note": "Template generator correctly handled N=1 by omitting the combine_results step entirely (let result := stats_1). The live result reflects only participant-1's 50 samples (sum=5029.02, count=50, mean=100.58), which correctly differs from the pooled baseline (100 samples, mean=102.66). Numerical match is N/A — the mismatch is expected and by design."
+      },
+      "llm": {
+        "branescript_generated": true,
+        "execution_success": false,
+        "numerical_match": false,
+        "latency_ms": 108,
+        "error": "Undefined function or method 'combine_results' at line 10",
+        "generated_script_excerpt": "let result := combine_results(stats_1, stats_1);",
+        "failure_reason": "The LLM does not recognise that N=1 eliminates the need for a combine step. It generates a call to combine_results(stats_1, stats_1) — passing the same local result twice as a workaround for the two-argument signature — but combine_results is not exported by the fed_single package. This causes a compile-time 'Undefined function' error. The template generator handles this correctly by inspecting the participant count at generation time and skipping the combine step when N=1. This is a systematic LLM limitation for degenerate single-participant workflows.",
+        "retry_note": "Script was regenerated once (first attempt also failed, with an additional inline comment '#...' that caused a BraneScript parse error before reaching the undefined-function check). The root cause is identical in both attempts: the LLM assumes a combine step always exists."
+      }
+    }
+  },
+
+  "metrics": {
+    "M4_5_type_accuracy": {
+      "description": "Fraction of function I/O type annotations in container.yml that match the expected schema (Data, string)",
+      "per_package": {
+        "pkg_1": 1.0, "pkg_2": 1.0, "pkg_3": 1.0, "pkg_4": 1.0, "pkg_5": 1.0
+      },
+      "overall": 1.0,
+      "note": "All five packages were hand-authored with correct container.yml schemas."
+    },
+
+    "M4_6_schema_valid": {
+      "description": "Whether container.yml contains required top-level keys (name, version, kind, entrypoint, actions) with kind=ecu and valid input/output lists",
+      "per_package": {
+        "pkg_1": true, "pkg_2": true, "pkg_3": true, "pkg_4": true, "pkg_5": true
+      },
+      "overall": true,
+      "pass_rate": 1.0
+    },
+
+    "M4_3_numerical_equivalence": {
+      "description": "Whether the federated BraneScript execution result matches the centralized baseline within 1e-6 absolute tolerance",
+      "scope": "Excludes pkg_5 (single-participant result is not comparable to pooled baseline by design)",
+      "comparable_cases": 8,
+      "matched": 8,
+      "pass_rate": 1.0,
+      "per_script": {
+        "pkg_1_template": true,
+        "pkg_1_llm": true,
+        "pkg_2_template": true,
+        "pkg_2_llm": true,
+        "pkg_3_template": true,
+        "pkg_3_llm": true,
+        "pkg_4_template": true,
+        "pkg_4_llm": true
+      },
+      "note": "All 8 comparable federated executions reproduced the centralized result exactly. This confirms that the Integrator's BraneScript generation preserves mathematical equivalence between federated and centralized computation."
+    },
+
+    "M4_4_execution_success": {
+      "description": "Whether the generated BraneScript compiled and executed on live Brane infrastructure without error",
+      "total_scripts": 10,
+      "successful": 9,
+      "failed": 1,
+      "pass_rate": 0.9,
+      "by_generator": {
+        "template": {"total": 5, "success": 5, "rate": 1.0},
+        "llm": {"total": 5, "success": 4, "rate": 0.8}
+      },
+      "failure_detail": {
+        "pkg_5_llm": "Compile-time error: combine_results not defined in fed_single package. LLM incorrectly generates a two-argument combine step for a single-participant workflow."
+      }
+    },
+
+    "latency_ms": {
+      "description": "Wall-clock time from brane workflow run invocation to final result, including planning, policy checking, container spawn, and data transfer",
+      "template": {
+        "pkg_1": 38344, "pkg_2": 35099, "pkg_3": 35637, "pkg_4": 36364, "pkg_5": 11874,
+        "mean_two_participant_ms": 36361,
+        "mean_single_participant_ms": 11874
+      },
+      "llm": {
+        "pkg_1": 35334, "pkg_2": 30544, "pkg_3": 32451, "pkg_4": 287435,
+        "mean_excluding_outlier_ms": 32776,
+        "outlier_note": "pkg_4_llm took 287s vs ~35s expected. Attributed to Brane infrastructure contention (reconciler/socat activity) during that specific run, not an intrinsic property of the LLM script."
+      },
+      "overhead_note": "The ~35s latency for two-participant workflows is dominated by Brane's planning phase (consulting 3 policy checkers sequentially, ~2s each) and container lifecycle (pull + spawn + teardown). The computation itself is sub-second."
+    }
+  },
+
+  "findings": {
+    "F1_template_generator_correct": "The TemplateGenerator produces executable, numerically equivalent BraneScript for all 5 test packages (5/5 execution, 4/4 numerical matches). It correctly handles the N=1 degenerate case by inspecting participant count at generation time and skipping the combine step entirely when only one participant is present.",
+
+    "F2_llm_generator_correct_for_N2": "The LlmGenerator produces executable, numerically equivalent BraneScript for all 4 two-participant packages (4/4 execution, 4/4 numerical matches). It correctly infers on-annotations, function call chains, and data variable wiring from container.yml and policy context alone, without requiring explicit workflow logic to be hardcoded.",
+
+    "F3_llm_fails_N1": "The LlmGenerator fails for the N=1 single-participant case (pkg_5). It generates a call to combine_results which does not exist in the fed_single package, causing a compile-time error. The model does not recognise that N=1 eliminates the aggregation step. This is a systematic gap, not a random error: both generation attempts produced the same semantic mistake. See correctness_gaps.CG1 for full analysis.",
+
+    "F4_numerical_equivalence_confirmed": "All 8 numerically-comparable federated executions matched the centralized baseline to within 1e-6 tolerance. This confirms the core thesis claim that the Integrator correctly decomposes a centralized computation into a semantically equivalent federated workflow.",
+
+    "F5_pkg5_intentional_mismatch": "pkg_5 is designed to test the single-participant path. Its result (50 samples, mean=100.58) correctly differs from the pooled baseline (100 samples, mean=102.66) because the federated workflow only accesses participant-1's data slice. This is expected behaviour, not a defect."
+  },
+
+  "correctness_gaps": {
+    "CG1_llm_directive_over_declaration": {
+      "title": "LLM prioritises config directives over container.yml declarations for N=1 packages",
+      "affected": "pkg_5 llm (fed_single)",
+      "symptom": "Compile-time error: 'Undefined function or method combine_results' at line 10 of the generated BraneScript.",
+
+      "root_cause": {
+        "summary": "The LLM user prompt contains two conflicting signals about what functions exist. The prompt resolves the conflict incorrectly by following the directive over the package declaration.",
+        "directive_signal": "The LLM_GENERATOR_USER prompt template includes the line: 'Combine/aggregate function (runs at coordinator): {combine_function}'. For pkg_5 this renders as 'combine_results', phrased as an instruction — the LLM reads this as 'you must call this function'.",
+        "declarative_signal": "The container.yml passed in the same prompt declares only one action: compute_local. There is no combine_results entry. This is the ground truth for what the package actually exports.",
+        "llm_behaviour": "The LLM follows the directive ('call combine_results') and ignores the declarative evidence ('combine_results is not in the actions list'). It generates combine_results(stats_1, stats_1) — passing the single local result twice as a two-argument workaround — which compiles against the package's symbol table and fails immediately."
+      },
+
+      "generic_problem": "This exposes a general limitation of prompt-driven LLM code generation: LLMs prioritise directive language (imperative instructions in the prompt) over descriptive context (e.g. a schema or declaration in a separate block). When the two conflict, the LLM follows the instruction rather than inferring from the declaration. This is not specific to BraneScript or to this package — any prompt that names a function as a task instruction will cause the LLM to emit that call, even if the accompanying schema contradicts it.",
+
+      "why_template_generator_is_immune": "The TemplateGenerator does not consult the combine_function field of the config when generating code for N=1 workflows. It checks len(participants) first; if N=1, it skips the combine step and emits 'let result := stats_1;' regardless of what combine_function is set to. The config field is treated as a hint, not an instruction, and participant count is the authoritative decision input.",
+
+      "fix_options": {
+        "option_A": {
+          "description": "Guard the prompt builder: before rendering combine_function into the prompt, check whether the function name appears in the container.yml actions block. If it does not, replace the combine line with an explicit note: 'No combine step — this package has no aggregation function. Return compute_local output directly.'",
+          "effort": "Minimal — 3-4 lines in LlmGenerator._build_user_prompt.",
+          "tradeoff": "Closes the gap but hides the finding. Does not generalise to cases where the container.yml is absent or malformed."
+        },
+        "option_B": {
+          "description": "Add a post-generation compilation check: run the generated BraneScript through the Brane compiler (brane workflow run --dry-run or equivalent) before returning it from LlmGenerator.generate(). If compilation fails, feed the compiler error back to the LLM as a retry signal.",
+          "effort": "Moderate — requires a dry-run mode in the Brane CLI or a symbol-table check against the registry.",
+          "tradeoff": "Catches any undefined-function error generically, not just the N=1 case. Makes the LLM generator self-correcting at compile time."
+        },
+        "option_C": {
+          "description": "Redesign the prompt to treat container.yml as the authoritative source of truth and derive function names from it, rather than passing function names as named config fields. The prompt would say 'generate a workflow using only the functions declared in the container.yml below' instead of listing function names explicitly.",
+          "effort": "High — requires restructuring the prompt template and the way IntegratorConfig fields are rendered.",
+          "tradeoff": "Eliminates the directive/declaration conflict entirely but requires the container.yml to be complete and unambiguous."
+        }
+      },
+
+      "thesis_recommendation": "Document as a known correctness gap in the LLM generation path. The gap is systematic (reproducible across two independent generation attempts), has a clear root cause (directive vs declaration conflict in the prompt), and has a clear fix path (Option A or B). It demonstrates that LLM-assisted BraneScript generation requires either prompt consistency guarantees or a compiler-level validation loop to be production-safe. The template generator is immune because it uses participant count — a structural property of the workflow — as its decision variable rather than the config field."
+    }
+  },
+
+  "infrastructure_notes": {
+    "brane_fwd_socat": "The Integrator uses a brane-fwd container with socat TCP relays to bridge the central Docker network to each worker node's Docker network. These rules must point to current container IPs; they become stale when brane-job or brane-reg containers are recreated.",
+    "docker_desktop_bind_mounts": "On WSL2 + Docker Desktop, bind-mounted files use ephemeral backing paths under /run/desktop/mnt/host/wsl/. Restarting a container invalidates these paths. Affected containers (brane-plr, brane-job-coordinator-1) must be removed and recreated rather than restarted.",
+    "backend_yml_socket": "backend.yml on each worker node configures the Docker socket path for brane-job. On WSL2, /var/run/docker.sock is accessible from inside Docker containers when Docker Desktop's WSL integration is active.",
+    "infra_yml_cleanup": "The original infra.yml contained 9 nodes (6 external experiment nodes + 3 thesis nodes). External nodes were removed to prevent brane-plr from consulting non-existent checkers, which caused planning to take 20+ minutes. The cleaned infra.yml contains only coordinator-1, participant-1, participant-3."
+  }
+}

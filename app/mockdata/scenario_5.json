@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "project_id": 5,
+  "project": {
+    "title": "FedCancer S5: High-Sensitivity Flags",
+    "type": "FDP",
+    "status": "open",
+    "fdp_config": {
+      "study_objective": "Compute federated mean age by cancer type — high sensitivity cohort with identified data",
+      "data_sensitivity_level": "High",
+      "legal_basis_for_processing": "consent",
+      "security_measures_planned": ["encryption_at_rest", "DP", "access_control"],
+      "result_sharing_policy": "Aggregated statistics only — no raw data",
+      "participant_responsibilities": "Keep local patient CSV on local nodes; apply DP before sharing results",
+      "third_party_collaboration": null
+    }
+  },
+  "accepted_participants": [
+    {
+      "user_id": 1,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s5_p1" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["EU"],
+        "identifiability.processingLevel": "Identified",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "No",
+        "ethicalLegal.irbApproval": "Yes",
+        "identifiability.directIdentifiers": "Yes",
+        "identifiability.quasiIdentifiers": "Yes",
+        "securityInfrastructure.auditLoggingRequired": "Yes",
+        "securityInfrastructure.networkConnectionPolicy": "ProxyOnly",
+        "securityInfrastructure.securityCertifications": ["ISO27001", "ISO27701"],
+        "dataGovernance.agreementsExist": "Yes",
+        "dataGovernance.modelUpdatesAllowed": "AfterDifferentialPrivacy",
+        "dataGovernance.requiresPerRoundApproval": "Yes",
+        "retentionRevocation.requiresUnlearning": "CaseByCase"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": null,
+        "meta.provenance": null,
+        "storage.source_of_truth": null
+      }
+    },
+    {
+      "user_id": 3,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s5_p3" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["EU"],
+        "identifiability.processingLevel": "Identified",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "No",
+        "ethicalLegal.irbApproval": "Yes",
+        "identifiability.directIdentifiers": "Yes",
+        "identifiability.quasiIdentifiers": "Yes",
+        "securityInfrastructure.auditLoggingRequired": "Yes",
+        "securityInfrastructure.networkConnectionPolicy": "ProxyOnly",
+        "securityInfrastructure.securityCertifications": ["ISO27001"],
+        "dataGovernance.agreementsExist": "Yes",
+        "dataGovernance.modelUpdatesAllowed": "AfterDifferentialPrivacy",
+        "dataGovernance.requiresPerRoundApproval": "Yes",
+        "retentionRevocation.requiresUnlearning": "CaseByCase"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": null,
+        "meta.provenance": null,
+        "storage.source_of_truth": null
+      }
+    }
+  ]
+}

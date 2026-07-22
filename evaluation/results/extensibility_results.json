@@ -1,0 +1,135 @@
+{
+  "metric": "M3.9",
+  "scenario": "Federated k-means with K=2 rounds (hypothetical fed_kmeans package)",
+  "note": "Rule 9 (package_registered) excluded \u2014 fed_kmeans not registered in Brane. Structural analysis only.",
+  "template": {
+    "validator_rules_1_8_passed": true,
+    "failed_rules": [],
+    "structural_properties": {
+      "P1_round_count": {
+        "passed": false,
+        "expected": 4,
+        "found": 2,
+        "description": "compute_assignments called 2x2=4 times (one per participant per round)"
+      },
+      "P2_compute_arity": {
+        "passed": false,
+        "total_calls_found": 2,
+        "calls_with_wrong_arity": 2,
+        "description": "every compute_assignments call has exactly 2 args: (local_data, centroids)"
+      },
+      "P3_centroids_threaded": {
+        "passed": false,
+        "round1_output_variable": "acc_0",
+        "later_compute_calls_found": 0,
+        "description": "round 2 compute_assignments calls pass round 1 aggregate_and_update output as centroids argument"
+      },
+      "summary": {
+        "passed": 0,
+        "total": 3,
+        "score": "0/3"
+      }
+    }
+  },
+  "llm": {
+    "n_runs": 3,
+    "runs": [
+      {
+        "run": 1,
+        "validator_rules_1_8_passed": true,
+        "failed_rules": [],
+        "structural_properties": {
+          "P1_round_count": {
+            "passed": true,
+            "expected": 4,
+            "found": 4,
+            "description": "compute_assignments called 2x2=4 times (one per participant per round)"
+          },
+          "P2_compute_arity": {
+            "passed": true,
+            "total_calls_found": 4,
+            "calls_with_wrong_arity": 0,
+            "description": "every compute_assignments call has exactly 2 args: (local_data, centroids)"
+          },
+          "P3_centroids_threaded": {
+            "passed": true,
+            "round1_output_variable": "global_r1",
+            "later_compute_calls_found": 2,
+            "description": "round 2 compute_assignments calls pass round 1 aggregate_and_update output as centroids argument"
+          },
+          "summary": {
+            "passed": 3,
+            "total": 3,
+            "score": "3/3"
+          }
+        },
+        "latency_ms": 6703
+      },
+      {
+        "run": 2,
+        "validator_rules_1_8_passed": true,
+        "failed_rules": [],
+        "structural_properties": {
+          "P1_round_count": {
+            "passed": true,
+            "expected": 4,
+            "found": 4,
+            "description": "compute_assignments called 2x2=4 times (one per participant per round)"
+          },
+          "P2_compute_arity": {
+            "passed": true,
+            "total_calls_found": 4,
+            "calls_with_wrong_arity": 0,
+            "description": "every compute_assignments call has exactly 2 args: (local_data, centroids)"
+          },
+          "P3_centroids_threaded": {
+            "passed": true,
+            "round1_output_variable": "global_r1",
+            "later_compute_calls_found": 2,
+            "description": "round 2 compute_assignments calls pass round 1 aggregate_and_update output as centroids argument"
+          },
+          "summary": {
+            "passed": 3,
+            "total": 3,
+            "score": "3/3"
+          }
+        },
+        "latency_ms": 6593
+      },
+      {
+        "run": 3,
+        "validator_rules_1_8_passed": true,
+        "failed_rules": [],
+        "structural_properties": {
+          "P1_round_count": {
+            "passed": true,
+            "expected": 4,
+            "found": 4,
+            "description": "compute_assignments called 2x2=4 times (one per participant per round)"
+          },
+          "P2_compute_arity": {
+            "passed": true,
+            "total_calls_found": 4,
+            "calls_with_wrong_arity": 0,
+            "description": "every compute_assignments call has exactly 2 args: (local_data, centroids)"
+          },
+          "P3_centroids_threaded": {
+            "passed": true,
+            "round1_output_variable": "global_r1",
+            "later_compute_calls_found": 2,
+            "description": "round 2 compute_assignments calls pass round 1 aggregate_and_update output as centroids argument"
+          },
+          "summary": {
+            "passed": 3,
+            "total": 3,
+            "score": "3/3"
+          }
+        },
+        "latency_ms": 5767
+      }
+    ],
+    "avg_structural_score": 3.0,
+    "llm_jaccard_consistency": 0.6217,
+    "template_vs_llm_jaccard": 0.4783
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "project_id": 8,
+  "project": {
+    "title": "FedCancer S8: Adversarial — Conflicting Policy Fields",
+    "type": "FDP",
+    "status": "open",
+    "fdp_config": {
+      "study_objective": "Compute federated mean age by cancer type — adversarial scenario with conflicting participant policies",
+      "data_sensitivity_level": "High",
+      "legal_basis_for_processing": "consent",
+      "security_measures_planned": ["encryption_at_rest"],
+      "result_sharing_policy": "Aggregated statistics only",
+      "participant_responsibilities": "Keep local patient CSV on local nodes",
+      "third_party_collaboration": null
+    }
+  },
+  "accepted_participants": [
+    {
+      "user_id": 1,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s8_p1" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["EU"],
+        "identifiability.processingLevel": "Pseudonymized",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "Yes",
+        "ethicalLegal.irbApproval": "Yes",
+        "identifiability.directIdentifiers": "No",
+        "identifiability.quasiIdentifiers": "Yes",
+        "securityInfrastructure.auditLoggingRequired": "Yes",
+        "securityInfrastructure.networkConnectionPolicy": "ProxyOnly",
+        "securityInfrastructure.securityCertifications": ["ISO27001"],
+        "dataGovernance.agreementsExist": "Yes",
+        "dataGovernance.modelUpdatesAllowed": "No",
+        "dataGovernance.requiresPerRoundApproval": "No",
+        "retentionRevocation.requiresUnlearning": "No"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "All patient records have been pseudonymized. Participants gave written informed consent. Data processed under GDPR Article 9(2)(a).",
+        "meta.provenance": null,
+        "storage.source_of_truth": null
+      }
+    },
+    {
+      "user_id": 3,
+      "is_active": true,
+      "brane_metadata": { "dataset_name": "cancer_age_s8_p3" },
+      "onboarding_answers": {
+        "organization.jurisdictions": ["US"],
+        "identifiability.processingLevel": "Identified",
+        "dataNature.involvesHumanResearch": "Yes",
+        "dataNature.retrospectiveConsent": "No",
+        "ethicalLegal.irbApproval": "No",
+        "identifiability.directIdentifiers": "Yes",
+        "identifiability.quasiIdentifiers": "Yes",
+        "securityInfrastructure.auditLoggingRequired": "No",
+        "securityInfrastructure.networkConnectionPolicy": "DirectOnly",
+        "securityInfrastructure.securityCertifications": [],
+        "dataGovernance.agreementsExist": "No",
+        "dataGovernance.modelUpdatesAllowed": "Always",
+        "dataGovernance.requiresPerRoundApproval": "Yes",
+        "retentionRevocation.requiresUnlearning": "Always"
+      },
+      "data_format_answers": {
+        "meta.privacy_legal": "This dataset contains raw identified patient records. No anonymization has been applied. We are legally obligated to contribute this data under the national health data act.",
+        "meta.provenance": null,
+        "storage.source_of_truth": null
+      }
+    }
+  ]
+}

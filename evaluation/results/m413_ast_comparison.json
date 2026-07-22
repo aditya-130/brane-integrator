@@ -1,0 +1,26 @@
+{
+  "per_package": {
+    "pkg_1": {
+      "ast_jaccard_avg": 0.9186,
+      "raw_line_jaccard_avg": 0.3792
+    },
+    "pkg_2": {
+      "ast_jaccard_avg": 0.9553,
+      "raw_line_jaccard_avg": 0.3763
+    },
+    "pkg_3": {
+      "ast_jaccard_avg": 0.9434,
+      "raw_line_jaccard_avg": 0.4523
+    },
+    "pkg_4": {
+      "ast_jaccard_avg": 0.9702,
+      "raw_line_jaccard_avg": 0.6422
+    },
+    "pkg_5": {
+      "ast_jaccard_avg": 0.9187,
+      "raw_line_jaccard_avg": 0.4366
+    }
+  },
+  "overall_ast_jaccard": 0.9412,
+  "overall_raw_line_jaccard": 0.4573
+}

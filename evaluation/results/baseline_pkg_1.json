@@ -1,0 +1,13 @@
+{
+  "package": "pkg_1",
+  "result": {
+    "Lung": 56.74,
+    "Prostate": 58.84,
+    "Colorectal": 52.49,
+    "Melanoma": 60.86,
+    "Breast": 61.52,
+    "Leukemia": 63.89,
+    "Lymphoma": 60.74,
+    "Pancreatic": 63.2
+  }
+}

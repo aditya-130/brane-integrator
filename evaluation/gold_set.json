@@ -1,0 +1,142 @@
+[
+  {
+    "id": "gs_001",
+    "source_field": "privacy_legal_notes",
+    "input_text": "All patient records have been pseudonymized by the hospital IT department prior to being made available for this study. The original identifiers are stored in a separate key file which is not accessible to this system.",
+    "expected_claims": [
+      {"policy_field": "identifiability", "policy_value": "Pseudonymized"}
+    ]
+  },
+  {
+    "id": "gs_002",
+    "source_field": "privacy_legal_notes",
+    "input_text": "Data has been fully anonymized. All direct and indirect identifiers have been removed and k-anonymity with k=5 has been verified by our data governance team. Re-identification is not reasonably possible.",
+    "expected_claims": [
+      {"policy_field": "identifiability", "policy_value": "Anonymized"}
+    ]
+  },
+  {
+    "id": "gs_003",
+    "source_field": "privacy_legal_notes",
+    "input_text": "The dataset contains raw patient records including names, dates of birth, and national identification numbers. No processing has been applied to identifying fields.",
+    "expected_claims": [
+      {"policy_field": "identifiability", "policy_value": "Identified"}
+    ]
+  },
+  {
+    "id": "gs_005",
+    "source_field": "privacy_legal_notes",
+    "input_text": "All participants have provided written informed consent for their data to be used in federated learning research. Consent was obtained using the standard ethics-approved form.",
+    "expected_claims": [
+      {"policy_field": "legal_basis", "policy_value": "consent"}
+    ]
+  },
+  {
+    "id": "gs_006",
+    "source_field": "data_provenance",
+    "input_text": "This dataset is derived from routine clinical care records. The data is highly sensitive as it contains oncology diagnoses, treatment histories, and genomic profiles.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "high"}
+    ]
+  },
+  {
+    "id": "gs_007",
+    "source_field": "data_provenance",
+    "input_text": "The dataset consists of aggregated hospital admission counts by month and region. No individual patient data is present. Sensitivity is minimal.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "low"}
+    ]
+  },
+  {
+    "id": "gs_008",
+    "source_field": "data_provenance",
+    "input_text": "Records have had names and addresses removed but still contain age, postcode district, and diagnosis codes which could in combination re-identify individuals in small populations.",
+    "expected_claims": []
+  },
+  {
+    "id": "gs_009",
+    "source_field": "source_of_truth",
+    "input_text": "Our institution is legally required under the national health data act to contribute anonymised records to approved research registries. Participation in this study is covered by that obligation.",
+    "expected_claims": [
+      {"policy_field": "legal_basis", "policy_value": "legal_obligation"}
+    ]
+  },
+  {
+    "id": "gs_010",
+    "source_field": "privacy_legal_notes",
+    "input_text": "Patient identifiers have been replaced with pseudonyms using a one-way hash function maintained by our data steward. The mapping table is held in a separate secure environment outside the scope of this project.",
+    "expected_claims": [
+      {"policy_field": "identifiability", "policy_value": "Pseudonymized"}
+    ]
+  },
+  {
+    "id": "gs_011",
+    "source_field": "data_provenance",
+    "input_text": "This is a lightly processed version of the raw survey responses. Some free-text fields have been redacted but numeric scores and demographic categories remain. The data carries moderate sensitivity.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "medium"}
+    ]
+  },
+  {
+    "id": "gs_012",
+    "source_field": "privacy_legal_notes",
+    "input_text": "We have a legitimate interest in processing this data as part of our ongoing quality improvement programme. The processing is proportionate and participants have been informed through our standard privacy notice.",
+    "expected_claims": [
+      {"policy_field": "legal_basis", "policy_value": "legitimate_interest"}
+    ]
+  },
+  {
+    "id": "gs_014",
+    "source_field": "data_provenance",
+    "input_text": "All variables in this dataset are computed statistics: means, standard deviations, and prevalence rates. The underlying individual records are never exported from the hospital system.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "low"}
+    ]
+  },
+  {
+    "id": "gs_015",
+    "source_field": "source_of_truth",
+    "input_text": "The dataset contains raw genomic sequencing data linked to patient clinical outcomes. This is highly sensitive personal health data subject to special category protections under GDPR Article 9.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "high"}
+    ]
+  },
+  {
+    "id": "gs_016",
+    "source_field": "privacy_legal_notes",
+    "input_text": "Processing is necessary to protect the vital interests of patients in emergency care scenarios where consent cannot be obtained in time.",
+    "expected_claims": [
+      {"policy_field": "legal_basis", "policy_value": "vital_interest"}
+    ]
+  },
+  {
+    "id": "gs_017",
+    "source_field": "data_provenance",
+    "input_text": "Patient records have been de-identified according to HIPAA Safe Harbor method. All 18 identifier categories have been removed.",
+    "expected_claims": [
+      {"policy_field": "identifiability", "policy_value": "Anonymized"}
+    ]
+  },
+  {
+    "id": "gs_018",
+    "source_field": "privacy_legal_notes",
+    "input_text": "This data was collected as part of routine hospital administration. We process it under our mandate as a public health authority to monitor and improve population health outcomes.",
+    "expected_claims": [
+      {"policy_field": "legal_basis", "policy_value": "public_task"}
+    ]
+  },
+  {
+    "id": "gs_019",
+    "source_field": "data_provenance",
+    "input_text": "The data is a general population survey about lifestyle habits including diet and exercise. No medical or clinical data is included. We consider it low sensitivity.",
+    "expected_claims": [
+      {"policy_field": "data_sensitivity", "policy_value": "low"}
+    ]
+  },
+  {
+    "id": "gs_020",
+    "source_field": "privacy_legal_notes",
+    "input_text": "We store patient data securely and follow all applicable regulations. The data is used for internal quality improvement only.",
+    "expected_claims": []
+  }
+]

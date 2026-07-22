@@ -21,6 +21,7 @@ class Workflow(SQLModel, table=True):
     execution_result: Optional[str] = None  # JSON-serialised result from Brane
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_at: Optional[datetime] = None
+    generated_at: Optional[datetime] = None
 
     __table_args__ = (
         UniqueConstraint("project_id", "cycle_id", name="unique_project_cycle"),

@@ -1,0 +1,128 @@
+{
+  "template": {
+    "first_pass_validity": 1.0,
+    "avg_latency_ms": 0
+  },
+  "llm": {
+    "first_pass_validity": 1.0,
+    "avg_latency_ms": 3327,
+    "avg_llm_calls": 1.0,
+    "avg_regeneration_count": 0.0,
+    "jaccard_consistency": 0.8048,
+    "rule_failure_distribution": {}
+  },
+  "per_scenario": {
+    "1": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 1820,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.7439,
+        "failed_rules_in_runs": []
+      }
+    },
+    "2": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 2518,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.7848,
+        "failed_rules_in_runs": []
+      }
+    },
+    "3": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 2007,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.876,
+        "failed_rules_in_runs": []
+      }
+    },
+    "4": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 2810,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.8718,
+        "failed_rules_in_runs": []
+      }
+    },
+    "5": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 3760,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.8353,
+        "failed_rules_in_runs": []
+      }
+    },
+    "6": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 4299,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.8737,
+        "failed_rules_in_runs": []
+      }
+    },
+    "7": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 4558,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.6747,
+        "failed_rules_in_runs": []
+      }
+    },
+    "8": {
+      "template": {
+        "passed": true,
+        "latency_ms": 0
+      },
+      "llm": {
+        "first_pass_rate": 1.0,
+        "avg_latency_ms": 4847,
+        "avg_llm_calls": 1.0,
+        "avg_regeneration_count": 0.0,
+        "jaccard_consistency": 0.7779,
+        "failed_rules_in_runs": []
+      }
+    }
+  }
+}

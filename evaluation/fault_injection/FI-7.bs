@@ -1,0 +1,21 @@
+import fed_mean;
+
+#![wf_tag("sensitivity.High")]
+#![wf_tag("legal_basis.consent")]
+#![wf_tag("jurisdiction.EU")]
+
+#[on("participant-1")]
+#[tag("identifiability.Pseudonymized")]
+let stats_1 := compute_local("cancer_age_s1_p1");
+
+#[on("participant-3")]
+#[tag("identifiability.Anonymized")]
+let stats_2 := compute_local("cancer_age_s1_p3");
+
+#[on("coordinator-1")]
+let acc_0 := combine_results(stats_1, stats_2);
+
+#[on("coordinator-1")]
+let final_result := finalize(acc_0);
+
+return final_result;

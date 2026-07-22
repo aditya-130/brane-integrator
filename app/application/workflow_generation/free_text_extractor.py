@@ -49,6 +49,11 @@ class FreeTextExtractor:
 
         raw_claims = result.get("claims", [])
 
+        high = sum(1 for c in raw_claims if isinstance(c, dict) and c.get("confidence") == "high")
+        medium = sum(1 for c in raw_claims if isinstance(c, dict) and c.get("confidence") == "medium")
+        low = sum(1 for c in raw_claims if isinstance(c, dict) and c.get("confidence") == "low")
+        logger.info("Raw claims from LLM: %d total — high=%d medium=%d low=%d", len(raw_claims), high, medium, low)
+
         # Gap 3 fix: discard low-confidence claims — weak guesses should not generate BraneScript constructs
         claims = [
             ExtractedClaim(**c)
